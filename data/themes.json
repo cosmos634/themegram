@@ -1,4 +1,28 @@
 {
-  "iOS": {"Dark": [], "Soft": [], "Anime": [], "Boshqa": []},
-  "Android": {"Dark": ["https://t.me/addtheme/bfSZRN44qat9dHCM"], "Soft": [], "Anime": [], "Boshqa": []}
+  "iOS": {
+    "Dark": [
+      {
+        "id": "ios-dark-001",
+        "name": "Dark Theme",
+        "url": "https://t.me/addtheme/HAQIQIY_TEMA_ID",
+        "description": "Qorong‘i uslub"
+      }
+    ],
+    "Soft": [],
+    "Anime": [],
+    "Boshqa": []
+  },
+  "Android": {
+    "Dark": [
+      {
+        "id": "android-dark-001",
+        "name": "Dark Theme",
+        "url": "https://t.me/addtheme/bfSZRN44qat9dHCM",
+        "description": "Qorong‘i uslub"
+      }
+    ],
+    "Soft": [],
+    "Anime": [],
+    "Boshqa": []
+  }
 }
