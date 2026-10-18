@@ -1,10 +1,11 @@
 """ThemeGram application entry point: Telegram webhook + health endpoint."""
 import asyncio
 import logging
-from pathlib import Path
 
 from aiohttp import web
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 from config import BASE_DIR, load_settings
@@ -21,6 +22,10 @@ logging.basicConfig(
 logger = logging.getLogger("themegram")
 
 
+async def health(request: web.Request) -> web.Response:
+    return web.json_response({"status": "ok"})
+
+
 async def main() -> None:
     settings = load_settings()
     db = UserStateDB(settings.database_path)
@@ -29,7 +34,10 @@ async def main() -> None:
     themes = ThemeService(BASE_DIR / "data" / "themes.json")
     themes.load()
 
-    bot = Bot(token=settings.bot_token)
+    bot = Bot(
+        token=settings.bot_token,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
     dispatcher = Dispatcher()
     dispatcher.include_router(start_router)
     dispatcher.include_router(themes_router)
@@ -39,7 +47,7 @@ async def main() -> None:
 
     cleanup_task = asyncio.create_task(cleanup_loop(db), name="themegram-state-cleanup")
     app = web.Application()
-    app.router.add_get("/health", lambda request: web.json_response({"status": "ok"}))
+    app.router.add_get("/health", health)
     webhook_url = settings.webhook_base_url + settings.webhook_path
     SimpleRequestHandler(
         dispatcher=dispatcher,
