@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: themegram
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    healthCheckPath: /health
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: CHANNEL_URL
+        sync: false
+      - key: WEBHOOK_BASE_URL
+        sync: false
+      - key: WEBHOOK_SECRET
+        sync: false
+      - key: WEBHOOK_PATH
+        value: /telegram/webhook
+      - key: DATABASE_PATH
+        value: data/themegram.sqlite3
