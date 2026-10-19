@@ -3,12 +3,19 @@
     "Dark": [
       {
         "id": "ios-dark-001",
-        "name": "Dark Theme",
-        "url": "https://t.me/addtheme/HAQIQIY_TEMA_ID",
-        "description": "Qorong‘i uslub"
+        "name": "Lighting",
+        "url": "https://t.me/addtheme/lightning_oboiqm",
+        "description": "Neon va qora uslub"
       }
     ],
-    "Soft": [],
+    "Soft": [
+        {
+        "id": "ios-soft-001",
+        "name": "White",
+        "url": "https://t.me/addtheme/whitethemeksk",
+        "description": "Oq soft uslub"
+      }
+    ],
     "Anime": [],
     "Boshqa": []
   },
@@ -19,6 +26,18 @@
         "name": "Dark Theme",
         "url": "https://t.me/addtheme/bfSZRN44qat9dHCM",
         "description": "Qorong‘i uslub"
+      }, 
+      {
+        "id": "android-dark-002",
+        "name": "Lighting",
+        "url": "https://t.me/addtheme/lightning_oboiqm",
+        "description": "Neon va qora uslub"
+      },
+      {
+        "id": "android-dark-003",
+        "name": "Knight",
+        "url": "https://t.me/addtheme/ru8lqpYI6LqFYiu0",
+        "description": "Qora va neon aralashgan uslub"
       }
     ],
     "Soft": [],
