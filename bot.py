@@ -29,7 +29,8 @@ async def health(request: web.Request) -> web.Response:
 
 async def main() -> None:
     settings = load_settings()
-    db = SupabaseDB(settings.supabase_url, settings.supabase_service_role_key)
+    db = SupabaseDB(settings.supabase_url, settings.supabase_service_role_key,
+                    cache_ttl_seconds=settings.theme_cache_ttl_seconds)
     await db.initialize()
 
     bot = Bot(
