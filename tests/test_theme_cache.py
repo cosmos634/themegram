@@ -48,6 +48,13 @@ class ThemeCacheTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await db.get_random("iOS", "Dark"))["id"], "2")
         self.assertEqual(db._request.await_count, 2)
 
+    async def test_admin_theme_write_invalidates_cache(self):
+        db = self.make_db()
+        db._theme_cache[("iOS", "Dark")] = (9999999999, [{"id": "old"}])
+        db._request.return_value = [{"id": "new", "name": "New"}]
+        await db.add_theme({"id": "new", "platform": "iOS", "category": "Dark"})
+        self.assertNotIn(("iOS", "Dark"), db._theme_cache)
+
     async def test_state_update_uses_one_upsert_and_preserves_omitted_fields(self):
         db = self.make_db()
         await db.set_theme(123, "theme-1")
