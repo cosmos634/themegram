@@ -161,16 +161,18 @@ class SupabaseDB:
     async def count(self, table: str, *, active_only=False) -> int:
         if table not in {"users", "themes"}:
             raise ValueError("Unsupported count table")
-        params = {"select": "*"}
-        if active_only:
-            params["is_active"] = "eq.true"
-        result = await self._request("GET", table, params=params, prefer="count=exact")
-        # REST response count is exposed via Content-Range; fallback to paged IDs for exact counts.
-        if table == "users":
-            rows = await self._request("GET", "users", params={"select": "telegram_id", "limit": "1000"})
-        else:
-            rows = await self._request("GET", "themes", params={"select": "id", **({"is_active":"eq.true"} if active_only else {}), "limit": "1000"})
-        return len(rows)
+        total = 0
+        offset = 0
+        while True:
+            params = {"select": "telegram_id" if table == "users" else "id",
+                      "offset": str(offset), "limit": "1000"}
+            if active_only:
+                params["is_active"] = "eq.true"
+            rows = await self._request("GET", table, params=params)
+            total += len(rows)
+            if len(rows) < 1000:
+                return total
+            offset += len(rows)
 
     async def user_ids(self) -> list[int]:
         result = []
