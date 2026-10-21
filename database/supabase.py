@@ -154,6 +154,9 @@ class SupabaseDB:
         return verified
 
     async def delete_theme(self, theme_id: str):
+        # Clear the optional state reference first so FK constraints cannot strand deletion.
+        await self._request("PATCH", "user_states", params={"current_theme_id": f"eq.{theme_id}"},
+                            json={"current_theme_id": None}, prefer="return=minimal")
         rows = await self._request("DELETE", "themes", params={"id": f"eq.{theme_id}", "select": "id"},
                                    prefer="return=representation")
         return bool(rows)
