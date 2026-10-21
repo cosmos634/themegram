@@ -1,69 +1,31 @@
-import json
-import tempfile
 import unittest
-from pathlib import Path
+from unittest.mock import AsyncMock
 
-from services.theme_service import ThemeDataError, ThemeService
-
-
-def valid_catalogue():
-    return {
-        "iOS": {
-            "Dark": [{"id": "dark-1", "name": "Night", "url": "https://example.org/night"}],
-            "Soft": [], "Anime": [], "Boshqa": [],
-        },
-        "Android": {
-            "Dark": [{"id": "dark-a", "name": "Night A", "url": "https://example.org/night-a"}],
-            "Soft": [], "Anime": [], "Boshqa": [],
-        },
-    }
+from services.theme_service import ThemeService
 
 
-class ThemeServiceTests(unittest.TestCase):
-    def setUp(self):
-        self.tempdir = tempfile.TemporaryDirectory()
-        self.path = Path(self.tempdir.name) / "themes.json"
+class ThemeServiceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_queries_supabase_with_platform_and_category(self):
+        db = AsyncMock()
+        db.get_random.return_value = {"id": "x", "name": "Night"}
+        service = ThemeService(db)
+        result = await service.get_random("iOS", "Dark")
+        self.assertEqual(result["id"], "x")
+        db.get_random.assert_awaited_once_with("iOS", "Dark", None)
 
-    def tearDown(self):
-        self.tempdir.cleanup()
+    async def test_previous_theme_is_passed_to_repository(self):
+        db = AsyncMock()
+        db.get_random.return_value = {"id": "next"}
+        result = await ThemeService(db).get_random("Android", "Anime", "previous")
+        self.assertEqual(result["id"], "next")
+        db.get_random.assert_awaited_once_with("Android", "Anime", "previous")
 
-    def write_catalogue(self, data):
-        self.path.write_text(json.dumps(data), encoding="utf-8")
-
-    def test_load_and_retrieve_by_os_and_category(self):
-        self.write_catalogue(valid_catalogue())
-        service = ThemeService(self.path)
-        service.load()
-        self.assertEqual(service.get_random("iOS", "Dark")["id"], "dark-1")
-        self.assertEqual(service.get_random("Android", "Dark")["id"], "dark-a")
-
-    def test_empty_category_returns_none(self):
-        self.write_catalogue(valid_catalogue())
-        service = ThemeService(self.path)
-        service.load()
-        self.assertIsNone(service.get_random("iOS", "Anime"))
-
-    def test_previous_theme_is_avoided_when_possible(self):
-        catalogue = valid_catalogue()
-        catalogue["iOS"]["Dark"].append({
-            "id": "dark-2", "name": "Night 2", "url": "https://example.org/night-2"
-        })
-        self.write_catalogue(catalogue)
-        service = ThemeService(self.path)
-        service.load()
-        self.assertEqual(service.get_random("iOS", "Dark", "dark-1")["id"], "dark-2")
-
-    def test_invalid_url_is_rejected(self):
-        catalogue = valid_catalogue()
-        catalogue["iOS"]["Dark"][0]["url"] = "javascript:alert(1)"
-        self.write_catalogue(catalogue)
-        with self.assertRaises(ThemeDataError):
-            ThemeService(self.path).load()
-
-    def test_malformed_json_is_rejected(self):
-        self.path.write_text("{broken", encoding="utf-8")
-        with self.assertRaises(ThemeDataError):
-            ThemeService(self.path).load()
+    async def test_invalid_platform_or_category_rejected(self):
+        service = ThemeService(AsyncMock())
+        with self.assertRaises(ValueError):
+            await service.get_random("Windows", "Dark")
+        with self.assertRaises(ValueError):
+            await service.get_random("iOS", "Unknown")
 
 
 if __name__ == "__main__":

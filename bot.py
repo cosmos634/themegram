@@ -8,10 +8,11 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
-from config import BASE_DIR, load_settings
-from database.db import UserStateDB
+from config import load_settings
+from database.supabase import SupabaseDB, SupabaseError
 from handlers.start import router as start_router
 from handlers.themes import router as themes_router
+from handlers.admin import router as admin_router
 from services.cleanup import cleanup_loop
 from services.theme_service import ThemeService
 
@@ -28,11 +29,8 @@ async def health(request: web.Request) -> web.Response:
 
 async def main() -> None:
     settings = load_settings()
-    db = UserStateDB(settings.database_path)
+    db = SupabaseDB(settings.supabase_url, settings.supabase_service_role_key)
     await db.initialize()
-
-    themes = ThemeService(BASE_DIR / "data" / "themes.json")
-    themes.load()
 
     bot = Bot(
         token=settings.bot_token,
@@ -41,9 +39,10 @@ async def main() -> None:
     dispatcher = Dispatcher()
     dispatcher.include_router(start_router)
     dispatcher.include_router(themes_router)
+    dispatcher.include_router(admin_router)
     dispatcher["db"] = db
     dispatcher["settings"] = settings
-    dispatcher["themes"] = themes
+    dispatcher["themes"] = ThemeService(db)
 
     cleanup_task = asyncio.create_task(cleanup_loop(db), name="themegram-state-cleanup")
     app = web.Application()
@@ -78,7 +77,7 @@ async def main() -> None:
         try:
             await bot.delete_webhook(drop_pending_updates=False)
         except Exception:
-            logger.exception("Could not delete webhook during shutdown")
+            logger.warning("Could not delete webhook during shutdown")
         await runner.cleanup()
         await bot.session.close()
         await db.close()
@@ -87,6 +86,6 @@ async def main() -> None:
 if __name__ == "__main__":
     try:
         asyncio.run(main())
-    except (ValueError, RuntimeError) as exc:
+    except (ValueError, RuntimeError, SupabaseError) as exc:
         logger.error("Startup failed: %s", exc)
         raise

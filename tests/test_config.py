@@ -17,6 +17,8 @@ class ConfigTests(unittest.TestCase):
             "CHANNEL_URL": "https://t.me/example",
             "WEBHOOK_BASE_URL": "https://themegram.example.com",
             "WEBHOOK_SECRET": "secret_with-valid-characters",
+            "SUPABASE_URL": "https://project.supabase.co",
+            "SUPABASE_SERVICE_ROLE_KEY": "test-secret",
             "PORT": "10000",
         }
         with patch.dict(os.environ, env, clear=True):
@@ -31,6 +33,8 @@ class ConfigTests(unittest.TestCase):
             "CHANNEL_URL": "https://t.me/example",
             "WEBHOOK_BASE_URL": "https://themegram.example.com",
             "WEBHOOK_SECRET": "contains spaces",
+            "SUPABASE_URL": "https://project.supabase.co",
+            "SUPABASE_SERVICE_ROLE_KEY": "test-secret",
         }
         with patch.dict(os.environ, env, clear=True):
             with self.assertRaisesRegex(ValueError, "WEBHOOK_SECRET"):
