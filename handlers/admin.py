@@ -165,10 +165,18 @@ async def filter_category(callback: CallbackQuery, settings):
 async def set_filter(callback: CallbackQuery, settings, db):
     if await deny_callback(callback, settings): return
     await callback.answer()
-    _, _, kind, value = callback.data.split(":", 3)
+    parts = callback.data.split(":")
+    kind, value = parts[1], parts[2]
     platform = value if kind == "setos" and value != "-" else None
     category = value if kind == "setcat" and value != "-" else None
-    await show_filters(callback.message, db, platform, category, 0)
+    # Preserve the other active filter while changing one dimension.
+    current_platform = None
+    current_category = None
+    if kind == "setos":
+        current_platform = platform
+    else:
+        current_category = category
+    await show_filters(callback.message, db, current_platform, current_category, 0)
 
 
 @router.callback_query(F.data.startswith("page:"))
