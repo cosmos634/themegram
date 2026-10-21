@@ -25,13 +25,16 @@ class Settings:
     webhook_secret: str
     webhook_path: str
     port: int
-    database_path: Path
     bot_username: str | None
+    supabase_url: str
+    supabase_service_role_key: str
+    admin_id: int | None
 
 
 def load_settings() -> Settings:
     values = {key: os.getenv(key, "").strip() for key in (
-        "BOT_TOKEN", "CHANNEL_URL", "WEBHOOK_BASE_URL", "WEBHOOK_SECRET"
+        "BOT_TOKEN", "CHANNEL_URL", "WEBHOOK_BASE_URL", "WEBHOOK_SECRET",
+        "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY",
     )}
     missing = [key for key, value in values.items() if not value]
     if missing:
@@ -40,22 +43,26 @@ def load_settings() -> Settings:
         raise ValueError("WEBHOOK_SECRET must contain only letters, digits, '_' or '-'.")
     base_url = https_url(values["WEBHOOK_BASE_URL"], "WEBHOOK_BASE_URL")
     channel_url = https_url(values["CHANNEL_URL"], "CHANNEL_URL")
+    supabase_url = https_url(values["SUPABASE_URL"], "SUPABASE_URL")
+    if not values["SUPABASE_SERVICE_ROLE_KEY"]:
+        raise ValueError("SUPABASE_SERVICE_ROLE_KEY is required.")
     path = os.getenv("WEBHOOK_PATH", "/telegram/webhook").strip()
     if not path.startswith("/") or path.startswith("//") or "?" in path or "#" in path:
         raise ValueError("WEBHOOK_PATH must be an absolute URL path.")
     path = path.rstrip("/") or "/"
     try:
         port = int(os.getenv("PORT", "10000"))
+        admin_raw = os.getenv("ADMIN_ID", "").strip()
+        admin_id = int(admin_raw) if admin_raw else None
     except ValueError as exc:
-        raise ValueError("PORT must be an integer.") from exc
+        raise ValueError("PORT and ADMIN_ID must be integers when set.") from exc
     if not 1 <= port <= 65535:
         raise ValueError("PORT must be between 1 and 65535.")
-    db_path = Path(os.getenv("DATABASE_PATH", "data/themegram.sqlite3"))
-    if not db_path.is_absolute():
-        db_path = (BASE_DIR / db_path).resolve()
     return Settings(
         bot_token=values["BOT_TOKEN"], channel_url=channel_url,
         webhook_base_url=base_url, webhook_secret=values["WEBHOOK_SECRET"],
-        webhook_path=path, port=port, database_path=db_path,
+        webhook_path=path, port=port,
         bot_username=os.getenv("BOT_USERNAME", "").strip().lstrip("@") or None,
+        supabase_url=supabase_url, supabase_service_role_key=values["SUPABASE_SERVICE_ROLE_KEY"],
+        admin_id=admin_id,
     )
