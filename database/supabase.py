@@ -55,9 +55,15 @@ class SupabaseDB:
         now=datetime.now(timezone.utc).isoformat()
         profile={"telegram_id":user.id,"username":user.username,"first_name":user.first_name,
                  "last_name":user.last_name,"language_code":user.language_code,"last_seen_at":now}
-        # Omit first_seen_at so an existing timestamp is never overwritten.
-        await self._request("POST","users",params={"on_conflict":"telegram_id"},json=profile,
-                            prefer="resolution=merge-duplicates,return=minimal")
+        # The repository does not include the live users-table schema, so preserve
+        # the existing first_seen_at insert/update semantics instead of assuming a DB default.
+        existing = await self._request("GET","users",params={"telegram_id":f"eq.{user.id}","select":"telegram_id","limit":"1"})
+        if existing:
+            await self._request("PATCH","users",params={"telegram_id":f"eq.{user.id}"},json=profile,
+                                prefer="return=minimal")
+        else:
+            profile["first_seen_at"] = now
+            await self._request("POST","users",json=profile,prefer="return=minimal")
         await self._request("POST","user_states",params={"on_conflict":"telegram_id"},
                             json={"telegram_id":user.id,"last_activity":now},
                             prefer="resolution=merge-duplicates,return=minimal")
