@@ -29,6 +29,7 @@ class Settings:
     supabase_url: str
     supabase_service_role_key: str
     admin_id: int | None
+    theme_cache_ttl_seconds: float
 
 
 def load_settings() -> Settings:
@@ -54,15 +55,18 @@ def load_settings() -> Settings:
         port = int(os.getenv("PORT", "10000"))
         admin_raw = os.getenv("ADMIN_ID", "").strip()
         admin_id = int(admin_raw) if admin_raw else None
+        theme_cache_ttl = float(os.getenv("THEME_CACHE_TTL_SECONDS", "60"))
     except ValueError as exc:
-        raise ValueError("PORT and ADMIN_ID must be integers when set.") from exc
+        raise ValueError("PORT, ADMIN_ID, and THEME_CACHE_TTL_SECONDS must be valid numbers.") from exc
     if not 1 <= port <= 65535:
         raise ValueError("PORT must be between 1 and 65535.")
+    if not 0 <= theme_cache_ttl <= 3600:
+        raise ValueError("THEME_CACHE_TTL_SECONDS must be between 0 and 3600.")
     return Settings(
         bot_token=values["BOT_TOKEN"], channel_url=channel_url,
         webhook_base_url=base_url, webhook_secret=values["WEBHOOK_SECRET"],
         webhook_path=path, port=port,
         bot_username=os.getenv("BOT_USERNAME", "").strip().lstrip("@") or None,
         supabase_url=supabase_url, supabase_service_role_key=values["SUPABASE_SERVICE_ROLE_KEY"],
-        admin_id=admin_id,
+        admin_id=admin_id, theme_cache_ttl_seconds=theme_cache_ttl,
     )
