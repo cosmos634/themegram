@@ -234,6 +234,8 @@ class SupabaseDB:
                                    json=values, prefer="return=representation")
         if not rows:
             raise SupabaseError("Theme was not updated; it may have been deleted.")
+        # The write succeeded, so prevent stale user-facing results even if verification later fails.
+        self.invalidate_theme_cache()
         verified = await self.get_theme(theme_id)
         if not verified or any(verified.get(k) != v for k, v in values.items()):
             raise SupabaseError("Theme update could not be verified.")
