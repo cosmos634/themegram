@@ -14,7 +14,11 @@ services:
         sync: false
       - key: WEBHOOK_SECRET
         sync: false
+      - key: SUPABASE_URL
+        value: https://ykekzvqooicvkwdvqdnc.supabase.co
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ADMIN_ID
+        sync: false
       - key: WEBHOOK_PATH
         value: /telegram/webhook
-      - key: DATABASE_PATH
-        value: data/themegram.sqlite3
