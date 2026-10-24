@@ -238,6 +238,14 @@ class SupabaseDB:
         # Preserve the last good snapshot until the next successful background refresh.
         self._last_theme_refresh = 0.0
 
+    async def _refresh_after_admin_change(self) -> None:
+        try:
+            await self.refresh_theme_cache()
+        except SupabaseError:
+            # The admin write already succeeded. Do not report it as failed;
+            # keep serving the last good cache and retry during the hourly refresh.
+            log.exception("Theme cache refresh after admin change failed; stale snapshot retained")
+
     async def get_random(self, platform: str, category: str, previous_id=None):
         rows = self._theme_cache.get((platform, category), [])
         if not rows:
@@ -248,7 +256,7 @@ class SupabaseDB:
     async def add_theme(self, theme: dict):
         rows = await self._request("POST", "themes", json=theme, prefer="return=representation")
         if rows:
-            await self.refresh_theme_cache()
+            await self._refresh_after_admin_change()
             return rows[0]
         return None
 
@@ -260,7 +268,7 @@ class SupabaseDB:
         verified = await self.get_theme(theme_id)
         if not verified or any(verified.get(k) != v for k, v in values.items()):
             raise SupabaseError("Theme update could not be verified.")
-        await self.refresh_theme_cache()
+        await self._refresh_after_admin_change()
         return verified
 
     async def delete_theme(self, theme_id: str):
@@ -269,7 +277,7 @@ class SupabaseDB:
         rows = await self._request("DELETE", "themes", params={"id": f"eq.{theme_id}", "select": "id"},
                                    prefer="return=representation")
         if rows:
-            await self.refresh_theme_cache()
+            await self._refresh_after_admin_change()
         return bool(rows)
 
     async def count(self, table: str, *, active_only=False) -> int:
