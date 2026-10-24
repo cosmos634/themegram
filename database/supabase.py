@@ -165,6 +165,8 @@ class SupabaseDB:
                                 json=states, prefer="resolution=merge-duplicates,return=minimal")
             self.local.mark_states_clean([int(row["telegram_id"]) for row in states])
 
+        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=3600)).isoformat()
+        await self._request("DELETE", "user_states", params={"last_activity": f"lt.{cutoff}"})
         offset = 0
         while True:
             rows = await self._request("GET", "user_states", params={
