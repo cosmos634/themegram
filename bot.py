@@ -45,6 +45,12 @@ async def main() -> None:
     dispatcher["themes"] = ThemeService(db)
 
     cleanup_task = asyncio.create_task(cleanup_loop(db), name="themegram-state-cleanup")
+    theme_refresh_task = asyncio.create_task(
+        db.theme_refresh_loop(), name="themegram-theme-cache-refresh"
+    )
+    state_sync_task = asyncio.create_task(
+        db.sync_loop(), name="themegram-state-sync"
+    )
     app = web.Application()
     app.router.add_get("/health", health)
     webhook_url = settings.webhook_base_url + settings.webhook_path
@@ -69,11 +75,13 @@ async def main() -> None:
         logger.info("ThemeGram webhook server started on port %s", settings.port)
         await asyncio.Event().wait()
     finally:
-        cleanup_task.cancel()
-        try:
-            await cleanup_task
-        except asyncio.CancelledError:
-            pass
+        for task in (cleanup_task, theme_refresh_task, state_sync_task):
+            task.cancel()
+        for task in (cleanup_task, theme_refresh_task, state_sync_task):
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
         try:
             await bot.delete_webhook(drop_pending_updates=False)
         except Exception:
