@@ -1,49 +1,79 @@
 from aiogram import Router, F
 from aiogram.filters import CommandStart
+from aiogram.filters.command import CommandObject
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-from keyboards.reply import main_reply_keyboard
+from keyboards.reply import main_reply_keyboard, language_keyboard
 from keyboards.inline import os_keyboard
 from database.supabase import SupabaseError
+from locales import t
+from services.traffic import parse_start_source
 
 router = Router(name="start")
+LANGUAGE_BUTTONS = {"🇺🇿 O‘zbekcha": "uz", "🇷🇺 Русский": "ru"}
+
+
+async def show_welcome(message: Message, language: str):
+    await message.answer(t(language, "welcome"), reply_markup=main_reply_keyboard(language))
 
 
 @router.message(CommandStart())
-async def start_handler(message: Message, db):
+async def start_handler(message: Message, db, command: CommandObject):
+    source = parse_start_source(command.args)
     try:
-        await db.touch(message.from_user)
+        await db.touch(message.from_user, first_source=source)
     except SupabaseError:
-        await message.answer("⚠️ Ma’lumotlar bazasiga ulanib bo‘lmadi. Iltimos, birozdan keyin qayta urinib ko‘ring.")
+        await message.answer(t("uz", "db_start_failed"))
         return
-    text = (
-        "👋 <b>ThemeGram’ga xush kelibsiz!</b>\n\n"
-        "📱 <b>iOS va Android</b> uchun temalarni toping.\n"
-        "🎨 <b>Foydalanish:</b> «Temalar»ni bosing, operatsion tizim va kategoriyani tanlang. "
-        "«O‘rnatish» temaga olib boradi, «Keyingi» esa boshqa temani ko‘rsatadi.\n\n"
-        "Boshlash uchun quyidagi menyudan foydalaning 👇"
-    )
-    await message.answer(text, reply_markup=main_reply_keyboard())
+    language = db.get_language(message.from_user.id)
+    if language not in {"uz", "ru"}:
+        await message.answer(t("uz", "choose_language"), reply_markup=language_keyboard())
+        return
+    await show_welcome(message, language)
 
 
-@router.message(F.text == "🎨 Temalar")
+@router.message(F.text.in_(set(LANGUAGE_BUTTONS)))
+async def choose_language(message: Message, db):
+    language = LANGUAGE_BUTTONS[message.text]
+    try:
+        await db.set_language(message.from_user.id, language)
+    except (SupabaseError, KeyError):
+        await message.answer(t(language, "save_failed"))
+        return
+    await message.answer(t(language, "language_saved"), reply_markup=main_reply_keyboard(language))
+    await show_welcome(message, language)
+
+
+@router.message(F.text.in_({"🌐 Tilni o‘zgartirish", "🌐 Изменить язык"}))
+async def change_language(message: Message, db):
+    try:
+        await db.touch(message.from_user, first_source="unknown")
+    except SupabaseError:
+        await message.answer(t("uz", "db_failed"))
+        return
+    language = db.get_language(message.from_user.id) or "uz"
+    await message.answer(t(language, "choose_language"), reply_markup=language_keyboard())
+
+
+@router.message(F.text.in_({"🎨 Temalar", "🎨 Темы"}))
 async def themes_entry(message: Message, db):
+    language = db.get_language(message.from_user.id) or "uz"
     try:
-        await db.touch(message.from_user)
+        await db.touch(message.from_user, first_source="unknown")
     except SupabaseError:
-        await message.answer("⚠️ Bazaga ulanib bo‘lmadi. Keyinroq qayta urinib ko‘ring.")
+        await message.answer(t(language, "db_failed"))
         return
-    await message.answer("📱 <b>Telefoningiz qaysi operatsion tizimda ishlaydi?</b>",
-                         reply_markup=os_keyboard())
+    await message.answer(t(language, "os_prompt"), reply_markup=os_keyboard(language))
 
 
-@router.message(F.text == "📢 Kanalga a’zo bo‘lish")
+@router.message(F.text.in_({"📢 Kanalga a’zo bo‘lish", "📢 Подписаться на канал"}))
 async def channel_entry(message: Message, settings, db):
+    language = db.get_language(message.from_user.id) or "uz"
     try:
-        await db.touch(message.from_user)
+        await db.touch(message.from_user, first_source="unknown")
     except SupabaseError:
-        await message.answer("⚠️ Bazaga ulanib bo‘lmadi. Keyinroq qayta urinib ko‘ring.")
+        await message.answer(t(language, "db_failed"))
         return
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="📢 Kanalni ochish", url=settings.channel_url)
+        InlineKeyboardButton(text=t(language, "channel_open"), url=settings.channel_url)
     ]])
-    await message.answer("📢 <b>Rasmiy kanalimiz:</b>", reply_markup=keyboard)
+    await message.answer(t(language, "channel_title"), reply_markup=keyboard)
