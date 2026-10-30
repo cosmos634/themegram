@@ -51,7 +51,7 @@ class LocalStateCache:
         first_seen = existing.get("first_seen_at") or profile.get("first_seen_at") or now
         # Merge rather than replace: language and first_source must survive normal /start calls.
         merged = {**existing, **profile}
-        merged["language"] = profile.get("language", existing.get("language"))
+        merged["language"] = profile.get("language") or existing.get("language")
         merged["first_source"] = existing.get("first_source") or profile.get("first_source") or "unknown"
         self.conn.execute(
             """INSERT INTO cached_users(telegram_id,profile_json,first_seen_at,dirty)
