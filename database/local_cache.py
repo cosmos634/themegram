@@ -37,22 +37,40 @@ class LocalStateCache:
 
     def get_user(self, user_id: int) -> dict[str, Any] | None:
         row = self.conn.execute(
-            "SELECT profile_json FROM cached_users WHERE telegram_id=?", (user_id,)
+            "SELECT profile_json, first_seen_at FROM cached_users WHERE telegram_id=?", (user_id,)
         ).fetchone()
-        return json.loads(row["profile_json"]) if row else None
+        if not row:
+            return None
+        profile = json.loads(row["profile_json"])
+        profile["first_seen_at"] = row["first_seen_at"]
+        return profile
 
     def touch_user(self, profile: dict[str, Any], now: str) -> None:
         user_id = int(profile["telegram_id"])
-        row = self.conn.execute(
-            "SELECT first_seen_at FROM cached_users WHERE telegram_id=?", (user_id,)
-        ).fetchone()
-        first_seen = row["first_seen_at"] if row else now
+        existing = self.get_user(user_id) or {}
+        first_seen = existing.get("first_seen_at") or profile.get("first_seen_at") or now
+        # Merge rather than replace: language and first_source must survive normal /start calls.
+        merged = {**existing, **profile}
+        merged["language"] = profile.get("language", existing.get("language"))
+        merged["first_source"] = existing.get("first_source") or profile.get("first_source") or "unknown"
         self.conn.execute(
             """INSERT INTO cached_users(telegram_id,profile_json,first_seen_at,dirty)
                VALUES(?,?,?,1)
                ON CONFLICT(telegram_id) DO UPDATE SET
                  profile_json=excluded.profile_json, dirty=1""",
-            (user_id, json.dumps(profile, ensure_ascii=False), first_seen),
+            (user_id, json.dumps(merged, ensure_ascii=False), first_seen),
+        )
+        self.conn.commit()
+
+    def set_user_language(self, user_id: int, language: str) -> None:
+        profile = self.get_user(user_id)
+        if profile is None:
+            raise KeyError(f"Unknown cached user: {user_id}")
+        profile["language"] = language
+        first_seen = profile.pop("first_seen_at", None)
+        self.conn.execute(
+            "UPDATE cached_users SET profile_json=?, dirty=1 WHERE telegram_id=?",
+            (json.dumps(profile, ensure_ascii=False), user_id),
         )
         self.conn.commit()
 
@@ -81,10 +99,8 @@ class LocalStateCache:
 
     def update_state(self, user_id: int, values: dict[str, Any], now: str) -> dict[str, Any]:
         state = self.get_state(user_id) or {
-            "telegram_id": user_id,
-            "selected_os": None,
-            "selected_category": None,
-            "current_theme_id": None,
+            "telegram_id": user_id, "selected_os": None,
+            "selected_category": None, "current_theme_id": None,
         }
         state.update(values)
         state["telegram_id"] = user_id
@@ -117,9 +133,7 @@ class LocalStateCache:
             self.conn.commit()
 
     def dirty_states(self) -> list[dict[str, Any]]:
-        rows = self.conn.execute(
-            "SELECT state_json FROM cached_states WHERE dirty=1"
-        ).fetchall()
+        rows = self.conn.execute("SELECT state_json FROM cached_states WHERE dirty=1").fetchall()
         return [json.loads(row["state_json"]) for row in rows]
 
     def mark_states_clean(self, ids: list[int]) -> None:
