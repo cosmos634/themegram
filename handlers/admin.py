@@ -108,12 +108,12 @@ async def admin_menu(callback: CallbackQuery, settings, db, state: FSMContext):
             ] or ["• Ma’lumot yo‘q"]
             langs = analytics["languages"]
             await callback.message.edit_text(
-                "📈 <b>Traffic Analytics</b>\\n\\n"
-                f"👥 Jami foydalanuvchilar: <b>{analytics['total']}</b>\\n\\n"
-                "<b>Kelish manbalari:</b>\\n" + "\\n".join(source_lines) + "\\n\\n"
-                "<b>Til statistikasi:</b>\\n"
-                f"🇺🇿 O‘zbekcha: <b>{langs['uz']}</b>\\n"
-                f"🇷🇺 Русский: <b>{langs['ru']}</b>\\n"
+                "📈 <b>Traffic Analytics</b>\n\n"
+                f"👥 Jami foydalanuvchilar: <b>{analytics['total']}</b>\n\n"
+                "<b>Kelish manbalari:</b>\n" + "\n".join(source_lines) + "\n\n"
+                "<b>Til statistikasi:</b>\n"
+                f"🇺🇿 O‘zbekcha: <b>{langs['uz']}</b>\n"
+                f"🇷🇺 Русский: <b>{langs['ru']}</b>\n"
                 f"⏳ Tanlanmagan: <b>{langs['unset']}</b>",
                 reply_markup=main_kb()
             )
