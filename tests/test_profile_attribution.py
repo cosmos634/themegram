@@ -24,6 +24,10 @@ class UserProfileCacheTests(unittest.TestCase):
             "telegram_id": 10, "username": "tester", "language": None,
             "first_source": "instagram", "first_seen_at": first_seen,
         }, first_seen)
+        self.cache.save_state(10, {
+            "telegram_id": 10, "selected_os": "iOS", "selected_category": "Dark",
+            "current_theme_id": "theme-1", "last_activity": first_seen,
+        }, dirty=False)
         self.cache.set_user_language(10, "ru")
         self.cache.touch_user({
             "telegram_id": 10, "username": "tester2", "language": None,
@@ -33,6 +37,7 @@ class UserProfileCacheTests(unittest.TestCase):
         self.assertEqual(profile["language"], "ru")
         self.assertEqual(profile["first_source"], "instagram")
         self.assertEqual(profile["first_seen_at"], first_seen)
+        self.assertEqual(self.cache.get_state(10)["current_theme_id"], "theme-1")
 
     def test_profile_changes_remain_dirty_until_successful_sync(self):
         now = datetime.now(timezone.utc).isoformat()
@@ -54,6 +59,33 @@ class SupabaseProfileSyncTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         self.db.local.close()
         self.tmp.cleanup()
+
+    async def test_repeated_touch_does_not_change_first_source_or_language(self):
+        now = datetime.now(timezone.utc).isoformat()
+        user = SimpleNamespace(id=15, username="tester", first_name="Test",
+                               last_name=None, language_code="uz")
+        self.db.local.touch_user({
+            "telegram_id": 15, "language": "ru", "first_source": "instagram",
+        }, now)
+        self.db._request = AsyncMock(return_value=[])
+        await self.db.touch(user, first_source="tiktok")
+        profile = self.db.local.get_user(15)
+        self.assertEqual(profile["first_source"], "instagram")
+        self.assertEqual(profile["language"], "ru")
+
+    async def test_traffic_analytics_counts_dynamic_sources_and_languages(self):
+        self.db.page_size = 10
+        self.db._request = AsyncMock(return_value=[
+            {"language": "uz", "first_source": "instagram"},
+            {"language": "ru", "first_source": "tiktok"},
+            {"language": None, "first_source": None},
+            {"language": "uz", "first_source": "new_campaign"},
+        ])
+        result = await self.db.traffic_analytics()
+        self.assertEqual(result["total"], 4)
+        self.assertEqual(result["sources"]["unknown"], 1)
+        self.assertEqual(result["sources"]["new_campaign"], 1)
+        self.assertEqual(result["languages"], {"uz": 2, "ru": 1, "unset": 1})
 
     async def test_failed_profile_sync_keeps_language_and_source_dirty(self):
         self.db.local.touch_user({
