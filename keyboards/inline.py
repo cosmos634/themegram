@@ -2,6 +2,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from locales import t
 
 OS_LABELS = {"iOS": "🍎 iOS", "Android": "🤖 Android"}
+CATEGORY_KEYS = {"Dark": "category_dark", "Soft": "category_soft", "Anime": "category_anime", "Boshqa": "category_other"}
 CATEGORY_LABELS = {"Dark": "🌑 Dark", "Soft": "☁️ Soft", "Anime": "🎌 Anime", "Boshqa": "✨ Boshqa"}
 
 
@@ -14,10 +15,10 @@ def os_keyboard(language: str = "uz"):
 
 def categories_keyboard(include_os_button: bool = False, language: str = "uz"):
     rows = [
-        [InlineKeyboardButton(text=CATEGORY_LABELS["Dark"], callback_data="cat:Dark"),
-         InlineKeyboardButton(text=CATEGORY_LABELS["Soft"], callback_data="cat:Soft")],
-        [InlineKeyboardButton(text=CATEGORY_LABELS["Anime"], callback_data="cat:Anime"),
-         InlineKeyboardButton(text=CATEGORY_LABELS["Boshqa"], callback_data="cat:Boshqa")],
+        [InlineKeyboardButton(text=t(language, CATEGORY_KEYS["Dark"]), callback_data="cat:Dark"),
+         InlineKeyboardButton(text=t(language, CATEGORY_KEYS["Soft"]), callback_data="cat:Soft")],
+        [InlineKeyboardButton(text=t(language, CATEGORY_KEYS["Anime"]), callback_data="cat:Anime"),
+         InlineKeyboardButton(text=t(language, CATEGORY_KEYS["Boshqa"]), callback_data="cat:Boshqa")],
     ]
     if include_os_button:
         rows.append([InlineKeyboardButton(text=t(language, "os_button"), callback_data="nav:os")])
