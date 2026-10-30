@@ -5,11 +5,16 @@ from aiogram.types import CallbackQuery
 from aiogram.exceptions import TelegramBadRequest
 from database.supabase import SupabaseError
 from keyboards.inline import (
-    os_keyboard, categories_keyboard, theme_keyboard, OS_LABELS, CATEGORY_LABELS
+    os_keyboard, categories_keyboard, theme_keyboard, OS_LABELS, CATEGORY_LABELS, CATEGORY_KEYS
 )
+from locales import t
 
 router = Router(name="themes")
 logger = logging.getLogger(__name__)
+
+
+def language_for(db, user_id: int) -> str:
+    return db.get_language(user_id) or "uz"
 
 
 async def safe_edit(callback: CallbackQuery, text: str, reply_markup=None):
@@ -25,87 +30,96 @@ async def safe_edit(callback: CallbackQuery, text: str, reply_markup=None):
 
 
 async def show_categories(callback: CallbackQuery, db, include_os_button=False):
+    language = language_for(db, callback.from_user.id)
     try:
         state = await db.get_state(callback.from_user.id)
     except SupabaseError:
-        await safe_edit(callback, "⚠️ Bazaga ulanib bo‘lmadi. Keyinroq qayta urinib ko‘ring.")
+        await safe_edit(callback, t(language, "db_failed"))
         return
     if not state or state.get("selected_os") not in OS_LABELS:
-        await safe_edit(callback, "📱 <b>Avval operatsion tizimni tanlang:</b>", os_keyboard())
+        await safe_edit(callback, t(language, "os_prompt"), os_keyboard(language))
         return
     os_name = state["selected_os"]
-    await safe_edit(callback,
-                    f"{OS_LABELS[os_name]} tanlandi.\n\n🎨 <b>Kerakli tema kategoriyasini tanlang:</b>",
-                    categories_keyboard(include_os_button))
+    await safe_edit(
+        callback, t(language, "os_selected", os=OS_LABELS[os_name]),
+        categories_keyboard(include_os_button, language)
+    )
 
 
 async def show_theme(callback, db, themes, os_name, category, previous_id=None):
+    language = language_for(db, callback.from_user.id)
     try:
         theme = await themes.get_random(os_name, category, previous_id)
         if theme is None:
-            await safe_edit(callback,
-                f"😕 <b>{escape(CATEGORY_LABELS[category])}</b> kategoriyasida hozircha temalar yo‘q.\n"
-                "Keyinroq qayta urinib ko‘ring.",
-                categories_keyboard(include_os_button=True))
+            await safe_edit(
+                callback, t(language, "category_empty", category=t(language, CATEGORY_KEYS[category])),
+                categories_keyboard(include_os_button=True, language=language)
+            )
             return
         await db.set_theme(callback.from_user.id, theme["id"])
     except SupabaseError:
-        await safe_edit(callback, "⚠️ Temalarni bazadan yuklab bo‘lmadi. Keyinroq qayta urinib ko‘ring.")
+        await safe_edit(callback, t(language, "themes_failed"))
         return
+    # Theme names/descriptions are creator-provided content; preserve their original text.
     text = f"🎨 <b>{escape(theme['name'])}</b>\n"
     description = theme.get("description")
     if description and description.strip():
         text += f"\n{escape(description.strip())}\n"
-    text += "\n📥 <i>Temani ochish uchun «O‘rnatish» tugmasini bosing.</i>"
-    await safe_edit(callback, text, theme_keyboard(theme["url"]))
+    text += "\n" + t(language, "install_hint")
+    await safe_edit(callback, text, theme_keyboard(theme["url"], language))
 
 
 @router.callback_query(F.data.startswith("os:"))
 async def choose_os(callback: CallbackQuery, db):
+    language = language_for(db, callback.from_user.id)
     os_name = callback.data.partition(":")[2]
     if os_name not in OS_LABELS:
-        await callback.answer("Noto‘g‘ri tanlov.", show_alert=True)
+        await callback.answer(t(language, "invalid_choice"), show_alert=True)
         return
     await callback.answer()
     try:
         await db.set_os(callback.from_user.id, os_name)
     except SupabaseError:
-        await safe_edit(callback, "⚠️ Tanlovni saqlab bo‘lmadi. Keyinroq urinib ko‘ring.")
+        await safe_edit(callback, t(language, "save_failed"))
         return
     await show_categories(callback, db)
 
 
 @router.callback_query(F.data.startswith("cat:"))
 async def choose_category(callback: CallbackQuery, db, themes):
+    language = language_for(db, callback.from_user.id)
     category = callback.data.partition(":")[2]
     if category not in CATEGORY_LABELS:
-        await callback.answer("Noto‘g‘ri kategoriya.", show_alert=True)
+        await callback.answer(t(language, "invalid_category"), show_alert=True)
         return
     await callback.answer()
     try:
         state = await db.get_state(callback.from_user.id)
         if not state or state.get("selected_os") not in OS_LABELS:
-            await safe_edit(callback, "📱 <b>Avval operatsion tizimni tanlang:</b>", os_keyboard())
+            await safe_edit(callback, t(language, "os_prompt"), os_keyboard(language))
             return
         await db.set_category(callback.from_user.id, category)
         await show_theme(callback, db, themes, state["selected_os"], category)
     except SupabaseError:
-        await safe_edit(callback, "⚠️ Tanlovni saqlab bo‘lmadi. Qaytadan urinib ko‘ring.")
+        await safe_edit(callback, t(language, "save_failed"))
 
 
 @router.callback_query(F.data == "theme:next")
 async def next_theme(callback: CallbackQuery, db, themes):
+    language = language_for(db, callback.from_user.id)
     await callback.answer()
     try:
         state = await db.get_state(callback.from_user.id)
     except SupabaseError:
-        await safe_edit(callback, "⚠️ Bazaga ulanib bo‘lmadi. Keyinroq urinib ko‘ring.")
+        await safe_edit(callback, t(language, "db_failed"))
         return
     if not state or state.get("selected_os") not in OS_LABELS or state.get("selected_category") not in CATEGORY_LABELS:
-        await safe_edit(callback, "⌛ Tanlov muddati tugagan. Qaytadan boshlang:", os_keyboard())
+        await safe_edit(callback, t(language, "theme_not_found"), os_keyboard(language))
         return
-    await show_theme(callback, db, themes, state["selected_os"], state["selected_category"],
-                     previous_id=state.get("current_theme_id"))
+    await show_theme(
+        callback, db, themes, state["selected_os"], state["selected_category"],
+        previous_id=state.get("current_theme_id")
+    )
 
 
 @router.callback_query(F.data == "nav:categories")
@@ -115,6 +129,7 @@ async def back_to_categories(callback: CallbackQuery, db):
 
 
 @router.callback_query(F.data == "nav:os")
-async def back_to_os(callback: CallbackQuery):
+async def back_to_os(callback: CallbackQuery, db):
     await callback.answer()
-    await safe_edit(callback, "📱 <b>Telefoningiz qaysi operatsion tizimda ishlaydi?</b>", os_keyboard())
+    language = language_for(db, callback.from_user.id)
+    await safe_edit(callback, t(language, "os_prompt"), os_keyboard(language))

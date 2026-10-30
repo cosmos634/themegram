@@ -31,6 +31,7 @@ def kb(rows):
 def main_kb():
     return kb([
         [InlineKeyboardButton(text="📊 Statistika", callback_data="adm:stats")],
+        [InlineKeyboardButton(text="📈 Traffic Analytics", callback_data="adm:traffic")],
         [InlineKeyboardButton(text="➕ Mavzu qo‘shish", callback_data="adm:add")],
         [InlineKeyboardButton(text="📚 Mavzularni boshqarish", callback_data="adm:list")],
         [InlineKeyboardButton(text="📢 Barcha foydalanuvchilarga xabar yuborish", callback_data="adm:broadcast")],
@@ -98,6 +99,29 @@ async def admin_menu(callback: CallbackQuery, settings, db, state: FSMContext):
                 reply_markup=main_kb())
         except SupabaseError:
             await callback.message.edit_text("⚠️ Statistikani bazadan olib bo‘lmadi. Qayta urinib ko‘ring.", reply_markup=main_kb())
+    elif action == "traffic":
+        try:
+            analytics = await db.traffic_analytics()
+            source_lines = [
+                f"• {name.replace('_', ' ').title()}: <b>{count}</b>"
+                for name, count in sorted(analytics["sources"].items(), key=lambda item: (-item[1], item[0]))
+            ] or ["• Ma’lumot yo‘q"]
+            langs = analytics["languages"]
+            await callback.message.edit_text(
+                "📈 <b>Traffic Analytics</b>\n\n"
+                f"👥 Jami foydalanuvchilar: <b>{analytics['total']}</b>\n\n"
+                "<b>Kelish manbalari:</b>\n" + "\n".join(source_lines) + "\n\n"
+                "<b>Til statistikasi:</b>\n"
+                f"🇺🇿 O‘zbekcha: <b>{langs['uz']}</b>\n"
+                f"🇷🇺 Русский: <b>{langs['ru']}</b>\n"
+                f"⏳ Tanlanmagan: <b>{langs['unset']}</b>",
+                reply_markup=main_kb()
+            )
+        except SupabaseError:
+            await callback.message.edit_text(
+                "⚠️ Traffic statistikasini olib bo‘lmadi. SQL migration bajarilganini tekshiring.",
+                reply_markup=main_kb()
+            )
     elif action == "add":
         await state.clear()
         await state.set_state(AddTheme.platform)
