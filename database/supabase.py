@@ -84,19 +84,73 @@ class SupabaseDB:
     def _now() -> str:
         return datetime.now(timezone.utc).isoformat()
 
-    async def touch(self, user) -> None:
+    async def touch(self, user, first_source: str = "direct") -> None:
         now = self._now()
-        self.local.touch_user({
+        cached = self.local.get_user(user.id)
+        if cached is None:
+            # A cold SQLite cache must hydrate the existing remote profile before writing,
+            # otherwise an old user's language/attribution could be overwritten by nulls.
+            rows = await self._request("GET", "users", params={
+                "telegram_id": f"eq.{user.id}", "select": "*", "limit": "1"
+            })
+            remote = rows[0] if rows else None
+            if remote:
+                profile = {
+                    **remote,
+                    "first_source": remote.get("first_source") or "unknown",
+                }
+            else:
+                profile = {"language": None, "first_source": first_source or "direct"}
+        else:
+            profile = cached
+        profile.update({
             "telegram_id": user.id, "username": user.username,
             "first_name": user.first_name, "last_name": user.last_name,
             "language_code": user.language_code, "last_seen_at": now,
-        }, now)
+        })
+        profile["first_source"] = profile.get("first_source") or "unknown"
+        self.local.touch_user(profile, now)
         state = self.local.get_state(user.id)
         if state:
             self.local.mark_state_activity(user.id, now)
         else:
             # First-time/missing state is the only normal interaction path that reads Supabase.
             await self.get_state(user.id)
+
+    async def set_language(self, user_id: int, language: str) -> None:
+        if language not in {"uz", "ru"}:
+            raise ValueError("Unsupported language")
+        if self.local.get_user(user_id) is None:
+            raise SupabaseError("User profile is not cached")
+        self.local.set_user_language(user_id, language)
+
+    def get_language(self, user_id: int) -> str | None:
+        profile = self.local.get_user(user_id)
+        return profile.get("language") if profile else None
+
+    async def traffic_analytics(self) -> dict:
+        """Aggregate attribution and language counts from the canonical users table."""
+        sources: dict[str, int] = {}
+        languages = {"uz": 0, "ru": 0, "unset": 0}
+        total = offset = 0
+        while True:
+            rows = await self._request("GET", "users", params={
+                "select": "language,first_source", "order": "telegram_id",
+                "offset": str(offset), "limit": str(self.page_size)
+            })
+            if not isinstance(rows, list):
+                raise SupabaseError("Unexpected analytics response")
+            for row in rows:
+                total += 1
+                source = row.get("first_source") or "unknown"
+                sources[source] = sources.get(source, 0) + 1
+                language = row.get("language")
+                bucket = language if language in {"uz", "ru"} else "unset"
+                languages[bucket] += 1
+            if len(rows) < self.page_size:
+                break
+            offset += len(rows)
+        return {"total": total, "sources": sources, "languages": languages}
 
     async def _state_update(self, user_id: int, values: dict) -> None:
         self.local.update_state(user_id, values, self._now())
