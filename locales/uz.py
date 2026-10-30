@@ -1,4 +1,8 @@
 STRINGS = {
+    "category_dark": "🌑 Dark",
+    "category_soft": "☁️ Soft",
+    "category_anime": "🎌 Anime",
+    "category_other": "✨ Boshqa",
     "choose_language": "🌐 <b>Tilni tanlang:</b>",
     "language_saved": "✅ Til o‘zbek tiliga o‘zgartirildi.",
     "welcome": "👋 <b>ThemeGram’ga xush kelibsiz!</b>\n\n📱 <b>iOS va Android</b> uchun temalarni toping.\n🎨 <b>Foydalanish:</b> «Temalar»ni bosing, operatsion tizim va kategoriyani tanlang. «O‘rnatish» temaga olib boradi, «Keyingi» esa boshqa temani ko‘rsatadi.\n\nBoshlash uchun quyidagi menyudan foydalaning 👇",
