@@ -5,7 +5,7 @@ from aiogram.types import CallbackQuery
 from aiogram.exceptions import TelegramBadRequest
 from database.supabase import SupabaseError
 from keyboards.inline import (
-    os_keyboard, categories_keyboard, theme_keyboard, OS_LABELS, CATEGORY_LABELS
+    os_keyboard, categories_keyboard, theme_keyboard, OS_LABELS, CATEGORY_LABELS, CATEGORY_KEYS
 )
 from locales import t
 
@@ -52,7 +52,7 @@ async def show_theme(callback, db, themes, os_name, category, previous_id=None):
         theme = await themes.get_random(os_name, category, previous_id)
         if theme is None:
             await safe_edit(
-                callback, t(language, "category_empty", category=CATEGORY_LABELS[category]),
+                callback, t(language, "category_empty", category=t(language, CATEGORY_KEYS[category])),
                 categories_keyboard(include_os_button=True, language=language)
             )
             return
