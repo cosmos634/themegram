@@ -25,7 +25,7 @@ def categories_keyboard(include_os_button: bool = False, language: str = "uz"):
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def theme_keyboard(url: str, language: str = "uz"):
+def theme_keyboard(url: str, language: str = "uz", theme_id: str | None = None):
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=t(language, "install"), url=url),
          InlineKeyboardButton(text=t(language, "next"), callback_data="theme:next")],
