@@ -67,7 +67,7 @@ async def show_theme(callback, db, themes, os_name, category, previous_id=None):
     if description and description.strip():
         text += f"\n{escape(description.strip())}\n"
     text += "\n" + t(language, "install_hint")
-    await safe_edit(callback, text, theme_keyboard(theme["url"], language))
+    await safe_edit(callback, text, theme_keyboard(theme["url"], language, str(theme["id"])))
 
 
 @router.callback_query(F.data.startswith("os:"))
