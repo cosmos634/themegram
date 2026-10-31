@@ -94,7 +94,7 @@ async def favorites_entry(message: Message, db):
     lines = [t(language, "favorites_title")]
     for theme in favorites[:30]:
         lines.append(f"• <b>{theme['name']}</b> — {theme['platform']} / {theme['category']}\n{theme['url']}")
-    await message.answer("\\n\\n".join(lines), disable_web_page_preview=True)
+    await message.answer("\n\n".join(lines), disable_web_page_preview=True)
 
 
 @router.message(Command("search"))
@@ -116,6 +116,6 @@ async def search_themes_handler(message: Message, db):
     lines = ["🔎 <b>Qidiruv natijalari</b>"]
     for theme in results:
         lines.append(
-            f"• <b>{theme['name']}</b> — {theme['platform']} / {theme['category']}\\n{theme['url']}"
+            f"• <b>{theme['name']}</b> — {theme['platform']} / {theme['category']}\n{theme['url']}"
         )
-    await message.answer("\\n\\n".join(lines), disable_web_page_preview=True)
+    await message.answer("\n\n".join(lines), disable_web_page_preview=True)
