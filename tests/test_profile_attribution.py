@@ -45,7 +45,7 @@ class UserProfileCacheTests(unittest.TestCase):
             "telegram_id": 11, "language": "uz", "first_source": "direct",
         }, now)
         self.assertEqual(len(self.cache.dirty_users()), 1)
-        self.cache.mark_users_clean([11])
+        self.cache.mark_users_clean(self.cache.dirty_users())
         self.assertEqual(self.cache.dirty_users(), [])
 
 

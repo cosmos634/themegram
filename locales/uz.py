@@ -27,4 +27,9 @@ STRINGS = {
     "next": "➡️ Keyingi",
     "home": "🏠 Bosh menyu",
     "input_placeholder": "Bo‘limni tanlang…",
+    "menu_favorites": "⭐ Sevimlilar",
+    "favorite_add": "⭐ Sevimlilarga saqlash",
+    "favorite_saved": "✅ Sevimlilarga saqlandi.",
+    "favorites_title": "⭐ <b>Sevimli temalaringiz</b>",
+    "favorites_empty": "Hozircha sevimli tema yo‘q.",
 }

@@ -50,7 +50,8 @@ class LocalStateCache:
         existing = self.get_user(user_id) or {}
         first_seen = existing.get("first_seen_at") or profile.get("first_seen_at") or now
         # Merge rather than replace: language and first_source must survive normal /start calls.
-        merged = {**existing, **profile}
+        # first_seen_at lives in its own SQLite column, not in profile_json.
+        merged = {k: v for k, v in {**existing, **profile}.items() if k != "first_seen_at"}
         merged["language"] = profile.get("language") or existing.get("language")
         merged["first_source"] = existing.get("first_source") or profile.get("first_source") or "unknown"
         self.conn.execute(
@@ -125,10 +126,15 @@ class LocalStateCache:
             result.append(profile)
         return result
 
-    def mark_users_clean(self, ids: list[int]) -> None:
-        if ids:
+    def mark_users_clean(self, snapshots: list[dict[str, Any]]) -> None:
+        """Clear dirty only if the row still matches the uploaded snapshot."""
+        if snapshots:
             self.conn.executemany(
-                "UPDATE cached_users SET dirty=0 WHERE telegram_id=?", [(i,) for i in ids]
+                """UPDATE cached_users SET dirty=0
+                   WHERE telegram_id=? AND profile_json=? AND first_seen_at=? AND dirty=1""",
+                [(int(row["telegram_id"]),
+                  json.dumps({k: v for k, v in row.items() if k != "first_seen_at"}, ensure_ascii=False),
+                  str(row["first_seen_at"])) for row in snapshots],
             )
             self.conn.commit()
 
@@ -136,10 +142,13 @@ class LocalStateCache:
         rows = self.conn.execute("SELECT state_json FROM cached_states WHERE dirty=1").fetchall()
         return [json.loads(row["state_json"]) for row in rows]
 
-    def mark_states_clean(self, ids: list[int]) -> None:
-        if ids:
+    def mark_states_clean(self, snapshots: list[dict[str, Any]]) -> None:
+        """Do not clear a newer edit that happened while an older snapshot uploaded."""
+        if snapshots:
             self.conn.executemany(
-                "UPDATE cached_states SET dirty=0 WHERE telegram_id=?", [(i,) for i in ids]
+                """UPDATE cached_states SET dirty=0
+                   WHERE telegram_id=? AND state_json=? AND dirty=1""",
+                [(int(row["telegram_id"]), json.dumps(row, ensure_ascii=False)) for row in snapshots],
             )
             self.conn.commit()
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import re
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -211,13 +212,13 @@ class SupabaseDB:
         if users:
             await self._request("POST", "users", params={"on_conflict": "telegram_id"},
                                 json=users, prefer="resolution=merge-duplicates,return=minimal")
-            self.local.mark_users_clean([int(row["telegram_id"]) for row in users])
+            self.local.mark_users_clean(users)
 
         states = self.local.dirty_states()
         if states:
             await self._request("POST", "user_states", params={"on_conflict": "telegram_id"},
                                 json=states, prefer="resolution=merge-duplicates,return=minimal")
-            self.local.mark_states_clean([int(row["telegram_id"]) for row in states])
+            self.local.mark_states_clean(states)
 
         cutoff = (datetime.now(timezone.utc) - timedelta(seconds=3600)).isoformat()
         await self._request("DELETE", "user_states", params={"last_activity": f"lt.{cutoff}"})
@@ -245,6 +246,79 @@ class SupabaseDB:
             except Exception:
                 # Local dirty rows remain marked dirty and are retried next hour.
                 log.exception("Hourly user-state sync failed; local changes retained")
+
+    async def track_event(self, user_id: int, event_name: str, metadata: dict | None = None) -> None:
+        """Record a small product-analytics event; failures are logged, not user-facing."""
+        if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", event_name):
+            raise ValueError("Invalid event name")
+        payload = {"telegram_id": int(user_id), "event_name": event_name,
+                   "metadata": metadata or {}}
+        try:
+            await self._request("POST", "themegram_events", json=payload,
+                                prefer="return=minimal")
+        except SupabaseError:
+            log.warning("event_tracking_failed event=%s", event_name)
+
+    async def event_analytics(self, days: int = 30) -> dict[str, int]:
+        """Return event totals for a bounded recent window."""
+        days = max(1, min(int(days), 90))
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        counts: dict[str, int] = {}
+        offset = 0
+        while True:
+            rows = await self._request("GET", "themegram_events", params={
+                "select": "event_name", "created_at": f"gte.{cutoff}",
+                "order": "id", "offset": str(offset), "limit": str(self.page_size)
+            })
+            if not isinstance(rows, list):
+                raise SupabaseError("Unexpected event analytics response")
+            for row in rows:
+                name = str(row.get("event_name") or "unknown")
+                counts[name] = counts.get(name, 0) + 1
+            if len(rows) < self.page_size:
+                break
+            offset += len(rows)
+        return counts
+
+    async def add_favorite(self, user_id: int, theme_id: str) -> bool:
+        rows = await self._request("POST", "themegram_favorites",
+            params={"on_conflict": "telegram_id,theme_id"},
+            json={"telegram_id": int(user_id), "theme_id": str(theme_id)},
+            prefer="resolution=ignore-duplicates,return=representation")
+        return bool(rows)
+
+    async def remove_favorite(self, user_id: int, theme_id: str) -> None:
+        await self._request("DELETE", "themegram_favorites", params={
+            "telegram_id": f"eq.{int(user_id)}", "theme_id": f"eq.{theme_id}"})
+
+    async def list_favorites(self, user_id: int) -> list[dict]:
+        rows = await self._request("GET", "themegram_favorites", params={
+            "select": "theme_id,created_at", "telegram_id": f"eq.{int(user_id)}",
+            "order": "created_at.desc", "limit": "100"})
+        result = []
+        for row in rows:
+            theme = await self.get_theme(str(row["theme_id"]))
+            if theme and theme.get("is_active", True):
+                result.append(theme)
+        return result
+
+    async def search_themes(self, query: str, *, platform: str | None = None,
+                            category: str | None = None, limit: int = 10) -> list[dict]:
+        import re
+        term = "".join(char if (char.isalnum() or char.isspace() or char in "-_") else " "
+                       for char in query.strip())
+        term = " ".join(term.split())
+        if not term or len(term) > 80:
+            return []
+        params = {"select": THEME_FIELDS, "is_active": "eq.true",
+                  "or": f"(name.ilike.*{term}*,description.ilike.*{term}*)",
+                  "order": "created_at.desc", "limit": str(max(1, min(limit, 20)))}
+        if platform in PLATFORMS:
+            params["platform"] = f"eq.{platform}"
+        if category in CATEGORIES:
+            params["category"] = f"eq.{category}"
+        rows = await self._request("GET", "themes", params=params)
+        return rows if isinstance(rows, list) else []
 
     async def list_themes(self, *, platform=None, category=None, active_only=False, offset=0, limit=10):
         params = {"select": "*", "order": "created_at.desc", "offset": str(offset), "limit": str(limit)}

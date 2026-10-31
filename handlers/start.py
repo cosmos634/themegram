@@ -1,5 +1,6 @@
 from aiogram import Router, F
-from aiogram.filters import CommandStart
+from html import escape
+from aiogram.filters import CommandStart, Command
 from aiogram.filters.command import CommandObject
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from keyboards.reply import main_reply_keyboard, language_keyboard
@@ -24,6 +25,7 @@ async def start_handler(message: Message, db, command: CommandObject):
     except SupabaseError:
         await message.answer(t("uz", "db_start_failed"))
         return
+    await db.track_event(message.from_user.id, "bot_started", {"source": source})
     language = db.get_language(message.from_user.id)
     if language not in {"uz", "ru"}:
         await message.answer(t("uz", "choose_language"), reply_markup=language_keyboard())
@@ -77,3 +79,59 @@ async def channel_entry(message: Message, settings, db):
         InlineKeyboardButton(text=t(language, "channel_open"), url=settings.channel_url)
     ]])
     await message.answer(t(language, "channel_title"), reply_markup=keyboard)
+
+
+@router.message(F.text.in_({"⭐ Sevimlilar", "⭐ Избранное"}))
+async def favorites_entry(message: Message, db):
+    language = db.get_language(message.from_user.id) or "uz"
+    try:
+        favorites = await db.list_favorites(message.from_user.id)
+    except SupabaseError:
+        await message.answer(t(language, "db_failed"))
+        return
+    if not favorites:
+        await message.answer(t(language, "favorites_empty"))
+        return
+    lines = [t(language, "favorites_title")]
+    for theme in favorites[:30]:
+        lines.append(
+            f"• <b>{escape(str(theme['name']))}</b> — "
+            f"{escape(str(theme['platform']))} / {escape(str(theme['category']))}\n"
+            f"{escape(str(theme['url']))}"
+        )
+    await message.answer("\n\n".join(lines), disable_web_page_preview=True)
+
+
+@router.message(Command("search"))
+async def search_themes_handler(message: Message, db):
+    language = db.get_language(message.from_user.id) or "uz"
+    query = (message.text or "").partition(" ")[2].strip()
+    if not query:
+        await message.answer(
+            "🔎 Qidirish uchun: /search tema nomi"
+            if language == "uz" else "🔎 Для поиска: /search название темы"
+        )
+        return
+    try:
+        results = await db.search_themes(query, limit=10)
+    except SupabaseError:
+        await message.answer(t(language, "db_failed"))
+        return
+    await db.track_event(message.from_user.id, "theme_search", {"query_length": min(len(query), 80)})
+    if not results:
+        await message.answer(
+            "🔎 Mos tema topilmadi." if language == "uz" else "🔎 Подходящие темы не найдены."
+        )
+        return
+    lines = ["🔎 <b>Qidiruv natijalari</b>"]
+    for theme in results:
+        lines.append(
+            f"• <b>{escape(str(theme['name']))}</b> — "
+            f"{escape(str(theme['platform']))} / {escape(str(theme['category']))}\n"
+            f"{escape(str(theme['url']))}"
+        )
+    lines[0] = (
+        "🔎 <b>Qidiruv natijalari</b>"
+        if language == "uz" else "🔎 <b>Результаты поиска</b>"
+    )
+    await message.answer("\n\n".join(lines), disable_web_page_preview=True)

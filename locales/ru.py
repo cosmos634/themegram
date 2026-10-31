@@ -27,4 +27,9 @@ STRINGS = {
     "next": "➡️ Следующая",
     "home": "🏠 Главное меню",
     "input_placeholder": "Выберите раздел…",
+    "menu_favorites": "⭐ Избранное",
+    "favorite_add": "⭐ В избранное",
+    "favorite_saved": "✅ Добавлено в избранное.",
+    "favorites_title": "⭐ <b>Ваши избранные темы</b>",
+    "favorites_empty": "Пока нет избранных тем.",
 }

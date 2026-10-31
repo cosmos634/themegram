@@ -60,13 +60,14 @@ async def show_theme(callback, db, themes, os_name, category, previous_id=None):
     except SupabaseError:
         await safe_edit(callback, t(language, "themes_failed"))
         return
+    await db.track_event(callback.from_user.id, "theme_viewed", {"theme_id": str(theme["id"]), "platform": os_name, "category": category})
     # Theme names/descriptions are creator-provided content; preserve their original text.
     text = f"🎨 <b>{escape(theme['name'])}</b>\n"
     description = theme.get("description")
     if description and description.strip():
         text += f"\n{escape(description.strip())}\n"
     text += "\n" + t(language, "install_hint")
-    await safe_edit(callback, text, theme_keyboard(theme["url"], language))
+    await safe_edit(callback, text, theme_keyboard(theme["url"], language, str(theme["id"])))
 
 
 @router.callback_query(F.data.startswith("os:"))
@@ -79,6 +80,7 @@ async def choose_os(callback: CallbackQuery, db):
     await callback.answer()
     try:
         await db.set_os(callback.from_user.id, os_name)
+        await db.track_event(callback.from_user.id, "os_selected", {"platform": os_name})
     except SupabaseError:
         await safe_edit(callback, t(language, "save_failed"))
         return
@@ -99,6 +101,7 @@ async def choose_category(callback: CallbackQuery, db, themes):
             await safe_edit(callback, t(language, "os_prompt"), os_keyboard(language))
             return
         await db.set_category(callback.from_user.id, category)
+        await db.track_event(callback.from_user.id, "category_selected", {"category": category})
         await show_theme(callback, db, themes, state["selected_os"], category)
     except SupabaseError:
         await safe_edit(callback, t(language, "save_failed"))
@@ -133,3 +136,19 @@ async def back_to_os(callback: CallbackQuery, db):
     await callback.answer()
     language = language_for(db, callback.from_user.id)
     await safe_edit(callback, t(language, "os_prompt"), os_keyboard(language))
+
+
+@router.callback_query(F.data.startswith("favorite:add:"))
+async def add_favorite(callback: CallbackQuery, db):
+    theme_id = callback.data.split(":", 2)[2]
+    language = language_for(db, callback.from_user.id)
+    try:
+        theme = await db.get_theme(theme_id)
+        if not theme or not theme.get("is_active", True):
+            await callback.answer(t(language, "theme_not_found"), show_alert=True)
+            return
+        await db.add_favorite(callback.from_user.id, theme_id)
+        await db.track_event(callback.from_user.id, "favorite_added", {"theme_id": theme_id})
+        await callback.answer(t(language, "favorite_saved"), show_alert=True)
+    except SupabaseError:
+        await callback.answer(t(language, "save_failed"), show_alert=True)

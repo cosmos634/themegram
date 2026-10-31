@@ -6,6 +6,7 @@ def main_reply_keyboard(language: str = "uz") -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=t(language, "menu_themes"))],
+            [KeyboardButton(text=t(language, "menu_favorites"))],
             [KeyboardButton(text=t(language, "menu_channel"))],
             [KeyboardButton(text=t(language, "menu_language"))],
         ],
