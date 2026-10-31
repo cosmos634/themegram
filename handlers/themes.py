@@ -136,3 +136,19 @@ async def back_to_os(callback: CallbackQuery, db):
     await callback.answer()
     language = language_for(db, callback.from_user.id)
     await safe_edit(callback, t(language, "os_prompt"), os_keyboard(language))
+
+
+@router.callback_query(F.data.startswith("favorite:add:"))
+async def add_favorite(callback: CallbackQuery, db):
+    theme_id = callback.data.split(":", 2)[2]
+    language = language_for(db, callback.from_user.id)
+    try:
+        theme = await db.get_theme(theme_id)
+        if not theme or not theme.get("is_active", True):
+            await callback.answer(t(language, "theme_not_found"), show_alert=True)
+            return
+        await db.add_favorite(callback.from_user.id, theme_id)
+        await db.track_event(callback.from_user.id, "favorite_added", {"theme_id": theme_id})
+        await callback.answer(t(language, "favorite_saved"), show_alert=True)
+    except SupabaseError:
+        await callback.answer(t(language, "save_failed"), show_alert=True)
