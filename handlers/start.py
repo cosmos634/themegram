@@ -78,3 +78,20 @@ async def channel_entry(message: Message, settings, db):
         InlineKeyboardButton(text=t(language, "channel_open"), url=settings.channel_url)
     ]])
     await message.answer(t(language, "channel_title"), reply_markup=keyboard)
+
+
+@router.message(F.text.in_({"⭐ Sevimlilar", "⭐ Избранное"}))
+async def favorites_entry(message: Message, db):
+    language = db.get_language(message.from_user.id) or "uz"
+    try:
+        favorites = await db.list_favorites(message.from_user.id)
+    except SupabaseError:
+        await message.answer(t(language, "db_failed"))
+        return
+    if not favorites:
+        await message.answer(t(language, "favorites_empty"))
+        return
+    lines = [t(language, "favorites_title")]
+    for theme in favorites[:30]:
+        lines.append(f"• <b>{theme['name']}</b> — {theme['platform']} / {theme['category']}\n{theme['url']}")
+    await message.answer("\\n\\n".join(lines), disable_web_page_preview=True)
