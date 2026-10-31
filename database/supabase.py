@@ -283,7 +283,9 @@ class SupabaseDB:
 
     async def search_themes(self, query: str, *, platform: str | None = None,
                             category: str | None = None, limit: int = 10) -> list[dict]:
-        term = query.strip()
+        import re
+        term = re.sub(r"[^\\w\\s-]", " ", query, flags=re.UNICODE)
+        term = " ".join(term.split())
         if not term or len(term) > 80:
             return []
         params = {"select": THEME_FIELDS, "is_active": "eq.true",
