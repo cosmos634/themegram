@@ -21,7 +21,7 @@ class StartLanguageFlowTests(unittest.IsolatedAsyncioTestCase):
     async def test_first_start_prompts_for_language_and_captures_source(self):
         message = self.make_message("/start instagram")
         db = SimpleNamespace(
-            touch=AsyncMock(), get_language=lambda user_id: None
+            touch=AsyncMock(), track_event=AsyncMock(), get_language=lambda user_id: None
         )
         command = SimpleNamespace(args="instagram")
         await start_handler(message, db, command)
@@ -31,7 +31,7 @@ class StartLanguageFlowTests(unittest.IsolatedAsyncioTestCase):
     async def test_saved_russian_language_is_reused_on_start(self):
         message = self.make_message("/start")
         db = SimpleNamespace(
-            touch=AsyncMock(), get_language=lambda user_id: "ru"
+            touch=AsyncMock(), track_event=AsyncMock(), get_language=lambda user_id: "ru"
         )
         await start_handler(message, db, SimpleNamespace(args=None))
         self.assertIn("Добро пожаловать", message.answer.await_args.args[0])
