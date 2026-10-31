@@ -108,12 +108,12 @@ async def admin_menu(callback: CallbackQuery, settings, db, state: FSMContext):
             viewed = events.get("theme_viewed", 0)
             favorites = events.get("favorite_added", 0)
             await callback.message.edit_text(
-                "🚀 <b>Growth Dashboard · 30 kun</b>\\n\\n"
-                f"▶️ Bot start hodisalari: <b>{starts}</b>\\n"
-                f"📱 OS tanlash: <b>{os_selected}</b>\\n"
-                f"🗂 Kategoriya tanlash: <b>{categories}</b>\\n"
-                f"🎨 Tema ko‘rish: <b>{viewed}</b>\\n"
-                f"⭐ Sevimliga qo‘shish: <b>{favorites}</b>\\n\\n"
+                "🚀 <b>Growth Dashboard · 30 kun</b>\n\n"
+                f"▶️ Bot start hodisalari: <b>{starts}</b>\n"
+                f"📱 OS tanlash: <b>{os_selected}</b>\n"
+                f"🗂 Kategoriya tanlash: <b>{categories}</b>\n"
+                f"🎨 Tema ko‘rish: <b>{viewed}</b>\n"
+                f"⭐ Sevimliga qo‘shish: <b>{favorites}</b>\n\n"
                 "<i>Bu hodisalar soni; noyob foydalanuvchilar soni emas.</i>",
                 reply_markup=main_kb())
         except SupabaseError:
