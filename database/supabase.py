@@ -246,6 +246,56 @@ class SupabaseDB:
                 # Local dirty rows remain marked dirty and are retried next hour.
                 log.exception("Hourly user-state sync failed; local changes retained")
 
+    async def track_event(self, user_id: int, event_name: str, metadata: dict | None = None) -> None:
+        """Record a small product-analytics event; failures are logged, not user-facing."""
+        import re
+        if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", event_name):
+            raise ValueError("Invalid event name")
+        payload = {"telegram_id": int(user_id), "event_name": event_name,
+                   "metadata": metadata or {}}
+        try:
+            await self._request("POST", "themegram_events", json=payload,
+                                prefer="return=minimal")
+        except SupabaseError:
+            log.warning("event_tracking_failed event=%s", event_name)
+
+    async def add_favorite(self, user_id: int, theme_id: str) -> bool:
+        rows = await self._request("POST", "themegram_favorites",
+            params={"on_conflict": "telegram_id,theme_id"},
+            json={"telegram_id": int(user_id), "theme_id": str(theme_id)},
+            prefer="resolution=ignore-duplicates,return=representation")
+        return bool(rows)
+
+    async def remove_favorite(self, user_id: int, theme_id: str) -> None:
+        await self._request("DELETE", "themegram_favorites", params={
+            "telegram_id": f"eq.{int(user_id)}", "theme_id": f"eq.{theme_id}"})
+
+    async def list_favorites(self, user_id: int) -> list[dict]:
+        rows = await self._request("GET", "themegram_favorites", params={
+            "select": "theme_id,created_at", "telegram_id": f"eq.{int(user_id)}",
+            "order": "created_at.desc", "limit": "100"})
+        result = []
+        for row in rows:
+            theme = await self.get_theme(str(row["theme_id"]))
+            if theme and theme.get("is_active", True):
+                result.append(theme)
+        return result
+
+    async def search_themes(self, query: str, *, platform: str | None = None,
+                            category: str | None = None, limit: int = 10) -> list[dict]:
+        term = query.strip()
+        if not term or len(term) > 80:
+            return []
+        params = {"select": THEME_FIELDS, "is_active": "eq.true",
+                  "or": f"(name.ilike.*{term}*,description.ilike.*{term}*)",
+                  "order": "created_at.desc", "limit": str(max(1, min(limit, 20)))}
+        if platform in PLATFORMS:
+            params["platform"] = f"eq.{platform}"
+        if category in CATEGORIES:
+            params["category"] = f"eq.{category}"
+        rows = await self._request("GET", "themes", params=params)
+        return rows if isinstance(rows, list) else []
+
     async def list_themes(self, *, platform=None, category=None, active_only=False, offset=0, limit=10):
         params = {"select": "*", "order": "created_at.desc", "offset": str(offset), "limit": str(limit)}
         if platform:
