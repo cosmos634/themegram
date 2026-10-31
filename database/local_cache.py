@@ -50,7 +50,8 @@ class LocalStateCache:
         existing = self.get_user(user_id) or {}
         first_seen = existing.get("first_seen_at") or profile.get("first_seen_at") or now
         # Merge rather than replace: language and first_source must survive normal /start calls.
-        merged = {**existing, **profile}
+        # first_seen_at lives in its own SQLite column, not in profile_json.
+        merged = {k: v for k, v in {**existing, **profile}.items() if k != "first_seen_at"}
         merged["language"] = profile.get("language") or existing.get("language")
         merged["first_source"] = existing.get("first_source") or profile.get("first_source") or "unknown"
         self.conn.execute(
