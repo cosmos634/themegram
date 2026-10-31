@@ -248,7 +248,6 @@ class SupabaseDB:
 
     async def track_event(self, user_id: int, event_name: str, metadata: dict | None = None) -> None:
         """Record a small product-analytics event; failures are logged, not user-facing."""
-        import re
         if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", event_name):
             raise ValueError("Invalid event name")
         payload = {"telegram_id": int(user_id), "event_name": event_name,
@@ -305,7 +304,8 @@ class SupabaseDB:
     async def search_themes(self, query: str, *, platform: str | None = None,
                             category: str | None = None, limit: int = 10) -> list[dict]:
         import re
-        term = re.sub(r"[^\\w\\s-]", " ", query, flags=re.UNICODE)
+        term = "".join(char if (char.isalnum() or char.isspace() or char in "-_") else " "
+                       for char in query.strip())
         term = " ".join(term.split())
         if not term or len(term) > 80:
             return []
