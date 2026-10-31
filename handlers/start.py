@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 from aiogram.filters.command import CommandObject
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from keyboards.reply import main_reply_keyboard, language_keyboard
@@ -94,4 +94,28 @@ async def favorites_entry(message: Message, db):
     lines = [t(language, "favorites_title")]
     for theme in favorites[:30]:
         lines.append(f"• <b>{theme['name']}</b> — {theme['platform']} / {theme['category']}\n{theme['url']}")
+    await message.answer("\\n\\n".join(lines), disable_web_page_preview=True)
+
+
+@router.message(Command("search"))
+async def search_themes_handler(message: Message, db):
+    language = db.get_language(message.from_user.id) or "uz"
+    query = (message.text or "").partition(" ")[2].strip()
+    if not query:
+        await message.answer("🔎 Qidirish uchun: /search tema nomi")
+        return
+    try:
+        results = await db.search_themes(query, limit=10)
+    except SupabaseError:
+        await message.answer(t(language, "db_failed"))
+        return
+    await db.track_event(message.from_user.id, "theme_search", {"query_length": min(len(query), 80)})
+    if not results:
+        await message.answer("🔎 Mos tema topilmadi.")
+        return
+    lines = ["🔎 <b>Qidiruv natijalari</b>"]
+    for theme in results:
+        lines.append(
+            f"• <b>{theme['name']}</b> — {theme['platform']} / {theme['category']}\\n{theme['url']}"
+        )
     await message.answer("\\n\\n".join(lines), disable_web_page_preview=True)
