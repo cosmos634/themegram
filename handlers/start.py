@@ -119,7 +119,9 @@ async def search_themes_handler(message: Message, db):
         return
     await db.track_event(message.from_user.id, "theme_search", {"query_length": min(len(query), 80)})
     if not results:
-        await message.answer("🔎 Mos tema topilmadi.")
+        await message.answer(
+            "🔎 Mos tema topilmadi." if language == "uz" else "🔎 Подходящие темы не найдены."
+        )
         return
     lines = ["🔎 <b>Qidiruv natijalari</b>"]
     for theme in results:
@@ -132,9 +134,4 @@ async def search_themes_handler(message: Message, db):
         "🔎 <b>Qidiruv natijalari</b>"
         if language == "uz" else "🔎 <b>Результаты поиска</b>"
     )
-    if not results:
-        await message.answer(
-            "🔎 Mos tema topilmadi." if language == "uz" else "🔎 Подходящие темы не найдены."
-        )
-        return
     await message.answer("\n\n".join(lines), disable_web_page_preview=True)
