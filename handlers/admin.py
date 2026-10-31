@@ -31,7 +31,7 @@ def kb(rows):
 def main_kb():
     return kb([
         [InlineKeyboardButton(text="📊 Statistika", callback_data="adm:stats")],
-        [InlineKeyboardButton(text="📈 Traffic Analytics", callback_data="adm:traffic")],
+        [InlineKeyboardButton(text="📈 Traffic Analytics", callback_data="adm:traffic")],\n        [InlineKeyboardButton(text="🚀 Growth Dashboard", callback_data="adm:growth")],
         [InlineKeyboardButton(text="➕ Mavzu qo‘shish", callback_data="adm:add")],
         [InlineKeyboardButton(text="📚 Mavzularni boshqarish", callback_data="adm:list")],
         [InlineKeyboardButton(text="📢 Barcha foydalanuvchilarga xabar yuborish", callback_data="adm:broadcast")],
@@ -99,6 +99,27 @@ async def admin_menu(callback: CallbackQuery, settings, db, state: FSMContext):
                 reply_markup=main_kb())
         except SupabaseError:
             await callback.message.edit_text("⚠️ Statistikani bazadan olib bo‘lmadi. Qayta urinib ko‘ring.", reply_markup=main_kb())
+    elif action == "growth":
+        try:
+            events = await db.event_analytics(30)
+            starts = events.get("bot_started", 0)
+            os_selected = events.get("os_selected", 0)
+            categories = events.get("category_selected", 0)
+            viewed = events.get("theme_viewed", 0)
+            favorites = events.get("favorite_added", 0)
+            await callback.message.edit_text(
+                "🚀 <b>Growth Dashboard · 30 kun</b>\\n\\n"
+                f"▶️ Bot start hodisalari: <b>{starts}</b>\\n"
+                f"📱 OS tanlash: <b>{os_selected}</b>\\n"
+                f"🗂 Kategoriya tanlash: <b>{categories}</b>\\n"
+                f"🎨 Tema ko‘rish: <b>{viewed}</b>\\n"
+                f"⭐ Sevimliga qo‘shish: <b>{favorites}</b>\\n\\n"
+                "<i>Bu hodisalar soni; noyob foydalanuvchilar soni emas.</i>",
+                reply_markup=main_kb())
+        except SupabaseError:
+            await callback.message.edit_text(
+                "⚠️ Growth statistikasi olinmadi. 004 migration bajarilganini tekshiring.",
+                reply_markup=main_kb())
     elif action == "traffic":
         try:
             analytics = await db.traffic_analytics()
