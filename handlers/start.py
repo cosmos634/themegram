@@ -1,4 +1,5 @@
 from aiogram import Router, F
+from html import escape
 from aiogram.filters import CommandStart, Command
 from aiogram.filters.command import CommandObject
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
@@ -93,7 +94,11 @@ async def favorites_entry(message: Message, db):
         return
     lines = [t(language, "favorites_title")]
     for theme in favorites[:30]:
-        lines.append(f"• <b>{theme['name']}</b> — {theme['platform']} / {theme['category']}\n{theme['url']}")
+        lines.append(
+            f"• <b>{escape(str(theme['name']))}</b> — "
+            f"{escape(str(theme['platform']))} / {escape(str(theme['category']))}\n"
+            f"{escape(str(theme['url']))}"
+        )
     await message.answer("\n\n".join(lines), disable_web_page_preview=True)
 
 
@@ -102,7 +107,10 @@ async def search_themes_handler(message: Message, db):
     language = db.get_language(message.from_user.id) or "uz"
     query = (message.text or "").partition(" ")[2].strip()
     if not query:
-        await message.answer("🔎 Qidirish uchun: /search tema nomi")
+        await message.answer(
+            "🔎 Qidirish uchun: /search tema nomi"
+            if language == "uz" else "🔎 Для поиска: /search название темы"
+        )
         return
     try:
         results = await db.search_themes(query, limit=10)
@@ -116,6 +124,17 @@ async def search_themes_handler(message: Message, db):
     lines = ["🔎 <b>Qidiruv natijalari</b>"]
     for theme in results:
         lines.append(
-            f"• <b>{theme['name']}</b> — {theme['platform']} / {theme['category']}\n{theme['url']}"
+            f"• <b>{escape(str(theme['name']))}</b> — "
+            f"{escape(str(theme['platform']))} / {escape(str(theme['category']))}\n"
+            f"{escape(str(theme['url']))}"
         )
+    lines[0] = (
+        "🔎 <b>Qidiruv natijalari</b>"
+        if language == "uz" else "🔎 <b>Результаты поиска</b>"
+    )
+    if not results:
+        await message.answer(
+            "🔎 Mos tema topilmadi." if language == "uz" else "🔎 Подходящие темы не найдены."
+        )
+        return
     await message.answer("\n\n".join(lines), disable_web_page_preview=True)
