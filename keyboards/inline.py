@@ -26,8 +26,11 @@ def categories_keyboard(include_os_button: bool = False, language: str = "uz"):
 
 
 def theme_keyboard(url: str, language: str = "uz", theme_id: str | None = None):
-    return InlineKeyboardMarkup(inline_keyboard=[
+    rows = [
         [InlineKeyboardButton(text=t(language, "install"), url=url),
          InlineKeyboardButton(text=t(language, "next"), callback_data="theme:next")],
         [InlineKeyboardButton(text=t(language, "home"), callback_data="nav:categories")],
-    ])
+    ]
+    if theme_id:
+        rows.insert(1, [InlineKeyboardButton(text=t(language, "favorite_add"), callback_data=f"favorite:add:{theme_id}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
