@@ -259,6 +259,27 @@ class SupabaseDB:
         except SupabaseError:
             log.warning("event_tracking_failed event=%s", event_name)
 
+    async def event_analytics(self, days: int = 30) -> dict[str, int]:
+        """Return event totals for a bounded recent window."""
+        days = max(1, min(int(days), 90))
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        counts: dict[str, int] = {}
+        offset = 0
+        while True:
+            rows = await self._request("GET", "themegram_events", params={
+                "select": "event_name", "created_at": f"gte.{cutoff}",
+                "order": "id", "offset": str(offset), "limit": str(self.page_size)
+            })
+            if not isinstance(rows, list):
+                raise SupabaseError("Unexpected event analytics response")
+            for row in rows:
+                name = str(row.get("event_name") or "unknown")
+                counts[name] = counts.get(name, 0) + 1
+            if len(rows) < self.page_size:
+                break
+            offset += len(rows)
+        return counts
+
     async def add_favorite(self, user_id: int, theme_id: str) -> bool:
         rows = await self._request("POST", "themegram_favorites",
             params={"on_conflict": "telegram_id,theme_id"},
