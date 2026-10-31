@@ -31,13 +31,13 @@ def kb(rows):
 def main_kb():
     return kb([
         [InlineKeyboardButton(text="📊 Statistika", callback_data="adm:stats")],
-        [InlineKeyboardButton(text="📈 Traffic Analytics", callback_data="adm:traffic")],\n        [InlineKeyboardButton(text="🚀 Growth Dashboard", callback_data="adm:growth")],
+        [InlineKeyboardButton(text="📈 Traffic Analytics", callback_data="adm:traffic")],
+        [InlineKeyboardButton(text="🚀 Growth Dashboard", callback_data="adm:growth")],
         [InlineKeyboardButton(text="➕ Mavzu qo‘shish", callback_data="adm:add")],
         [InlineKeyboardButton(text="📚 Mavzularni boshqarish", callback_data="adm:list")],
         [InlineKeyboardButton(text="📢 Barcha foydalanuvchilarga xabar yuborish", callback_data="adm:broadcast")],
         [InlineKeyboardButton(text="🔙 Asosiy menyu", callback_data="adm:close")],
     ])
-
 
 def cancel_kb():
     return kb([[InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm:cancel")]])
