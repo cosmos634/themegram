@@ -211,13 +211,13 @@ class SupabaseDB:
         if users:
             await self._request("POST", "users", params={"on_conflict": "telegram_id"},
                                 json=users, prefer="resolution=merge-duplicates,return=minimal")
-            self.local.mark_users_clean([int(row["telegram_id"]) for row in users])
+            self.local.mark_users_clean(users)
 
         states = self.local.dirty_states()
         if states:
             await self._request("POST", "user_states", params={"on_conflict": "telegram_id"},
                                 json=states, prefer="resolution=merge-duplicates,return=minimal")
-            self.local.mark_states_clean([int(row["telegram_id"]) for row in states])
+            self.local.mark_states_clean(states)
 
         cutoff = (datetime.now(timezone.utc) - timedelta(seconds=3600)).isoformat()
         await self._request("DELETE", "user_states", params={"last_activity": f"lt.{cutoff}"})
