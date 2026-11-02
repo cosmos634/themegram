@@ -4,7 +4,8 @@ ThemeGram is an Uzbek- and Russian-language Telegram bot for browsing iOS and An
 
 ## Features
 - iOS / Android themes in Dark, Soft, Anime, Boshqa categories.
-- Image-to-theme generator for Telegram Android: send a JPG, PNG, or WEBP image and receive a named .attheme file.\n- Random active theme selection without immediate repeats when alternatives exist.
+- Image-to-theme generator for Telegram Android: send a JPG, PNG, or WEBP image and receive a named .attheme file.
+- Random active theme selection without immediate repeats when alternatives exist.
 - Exactly up to 50 active themes cached per platform/category (8 groups total).
 - Theme cache warms at startup and refreshes in the background every hour. Users get themes from the in-memory snapshot only; failed refreshes keep the last successful snapshot.
 - User profiles and temporary user state are cached in SQLite. Normal interactions read and write local state; a missing state is fetched from Supabase once.
@@ -15,7 +16,10 @@ ThemeGram is an Uzbek- and Russian-language Telegram bot for browsing iOS and An
 
 ## Environment
 Required: `BOT_TOKEN`, `CHANNEL_URL`, `WEBHOOK_BASE_URL`, `WEBHOOK_SECRET`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. Set `ADMIN_ID` to enable admin access.
-Optional: `BOT_USERNAME`, `WEBHOOK_PATH` (default `/telegram/webhook`), `PORT` (default `10000`), `STATE_CACHE_PATH` (default `themegram_cache.sqlite3`), `ATTHEME_API_URL`, and `ATTHEME_API_KEY`.\n\n## Attheme generator setup\nSet `ATTHEME_API_URL` to the deployed generator API origin (without `/api/v1/generate`) and `ATTHEME_API_KEY` to the same secret configured as `API_KEY` on that API. Both values are required to enable the “Tema yaratish” reply-keyboard button. The API key stays on the bot server and is never sent to Telegram users. This generator currently creates themes for Telegram Android only.
+Optional: `BOT_USERNAME`, `WEBHOOK_PATH` (default `/telegram/webhook`), `PORT` (default `10000`), `STATE_CACHE_PATH` (default `themegram_cache.sqlite3`), `ATTHEME_API_URL`, and `ATTHEME_API_KEY`.
+
+## Attheme generator setup
+Set `ATTHEME_API_URL` to the deployed generator API origin (without `/api/v1/generate`) and `ATTHEME_API_KEY` to the same secret configured as `API_KEY` on that API. Both values are required to enable the “Tema yaratish” reply-keyboard button. The API key stays on the bot server and is never sent to Telegram users. This generator currently creates themes for Telegram Android only.
 
 ## Local setup
 1. Use Python 3.11+ and run `pip install -r requirements.txt`.
