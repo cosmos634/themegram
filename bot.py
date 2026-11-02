@@ -6,11 +6,13 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 from config import load_settings
 from database.supabase import SupabaseDB, SupabaseError
 from handlers.start import router as start_router
+from handlers.attheme import router as attheme_router
 from handlers.themes import router as themes_router
 from handlers.admin import router as admin_router
 from services.cleanup import cleanup_loop
@@ -36,8 +38,9 @@ async def main() -> None:
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
-    dispatcher = Dispatcher()
+    dispatcher = Dispatcher(storage=MemoryStorage())
     dispatcher.include_router(start_router)
+    dispatcher.include_router(attheme_router)
     dispatcher.include_router(themes_router)
     dispatcher.include_router(admin_router)
     dispatcher["db"] = db
