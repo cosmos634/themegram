@@ -12,5 +12,13 @@ class LocaleTests(unittest.TestCase):
         self.assertEqual(normalize_language("xx"), "uz")
         self.assertEqual(t("xx", "menu_channel"), "📢 Kanalga a’zo bo‘lish")
 
+    def test_attheme_flow_translations_exist(self):
+        for language in ("uz", "ru"):
+            self.assertIn("Android", t(language, "attheme_intro"))
+            self.assertIn(".attheme", t(language, "attheme_ready", theme_name="ThemeGram_Test"))
+            self.assertTrue(t(language, "attheme_processing"))
+            self.assertTrue(t(language, "menu_create_theme"))
+
+
 if __name__ == "__main__":
     unittest.main()
