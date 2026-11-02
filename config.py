@@ -29,6 +29,8 @@ class Settings:
     supabase_url: str
     supabase_service_role_key: str
     admin_id: int | None
+    attheme_api_url: str | None
+    attheme_api_key: str | None
 
 
 def load_settings() -> Settings:
@@ -44,8 +46,10 @@ def load_settings() -> Settings:
     base_url = https_url(values["WEBHOOK_BASE_URL"], "WEBHOOK_BASE_URL")
     channel_url = https_url(values["CHANNEL_URL"], "CHANNEL_URL")
     supabase_url = https_url(values["SUPABASE_URL"], "SUPABASE_URL")
-    if not values["SUPABASE_SERVICE_ROLE_KEY"]:
-        raise ValueError("SUPABASE_SERVICE_ROLE_KEY is required.")
+    attheme_api_url = os.getenv("ATTHEME_API_URL", "").strip()
+    attheme_api_key = os.getenv("ATTHEME_API_KEY", "").strip()
+    if attheme_api_url:
+        attheme_api_url = https_url(attheme_api_url, "ATTHEME_API_URL")
     path = os.getenv("WEBHOOK_PATH", "/telegram/webhook").strip()
     if not path.startswith("/") or path.startswith("//") or "?" in path or "#" in path:
         raise ValueError("WEBHOOK_PATH must be an absolute URL path.")
@@ -65,4 +69,6 @@ def load_settings() -> Settings:
         bot_username=os.getenv("BOT_USERNAME", "").strip().lstrip("@") or None,
         supabase_url=supabase_url, supabase_service_role_key=values["SUPABASE_SERVICE_ROLE_KEY"],
         admin_id=admin_id,
+        attheme_api_url=attheme_api_url or None,
+        attheme_api_key=attheme_api_key or None,
     )
