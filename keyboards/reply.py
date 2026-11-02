@@ -13,6 +13,7 @@ def main_reply_keyboard(language: str = "uz") -> ReplyKeyboardMarkup:
                 KeyboardButton(text=t(language, "menu_channel")),
                 KeyboardButton(text=t(language, "menu_language")),
             ],
+            [KeyboardButton(text=t(language, "menu_create_theme"))],
         ],
         resize_keyboard=True,
         input_field_placeholder=t(language, "input_placeholder"),
