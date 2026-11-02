@@ -12,6 +12,8 @@ STRINGS = {
     "menu_create_theme": "✨ Tema yaratish",
     "attheme_intro": "📱 <b>Bu funksiya hozircha faqat Telegram Android uchun ishlaydi.</b>\n\n🎨 Rasm yuboring. Algoritm uning ranglarini tahlil qilib, sizga maxsus tema tayyorlaydi.\n\nJPG, PNG yoki WEBP formatidagi rasm yuboring. Bekor qilish: /cancel",
     "attheme_processing": "🧠 Ranglar tahlil qilinmoqda...\n🎨 Telegram uchun yangi tema yig‘ilmoqda.\n\nBir oz sabr — natija tayyorlanmoqda!",
+    "attheme_ask_name": "✍️ <b>Temangizga qanday nom beramiz?</b>\nFayl nomini yuboring. Masalan: <code>Midnight_Purple</code>",
+    "attheme_name_invalid": "Nom 1–48 belgidan iborat bo‘lsin. Harf va raqamlardan foydalaning.",
     "attheme_file_ready": "✨ <b>Tema tayyor!</b> Faylni quyida yuklab oling.",
     "attheme_ready": "🎉 <b>{theme_name}</b> temasi yaratildi!\n\n📥 Faylni Telegram Android’da ochib, temani qo‘llashingiz mumkin.",
     "attheme_cancelled": "Jarayon bekor qilindi. Yangi tema yaratish uchun «✨ Tema yaratish» tugmasini bosing.",

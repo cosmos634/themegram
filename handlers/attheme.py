@@ -2,7 +2,6 @@ import logging
 import re
 from html import escape
 from io import BytesIO
-from urllib.parse import unquote
 
 import aiohttp
 from aiogram import F, Router
@@ -24,17 +23,22 @@ ALLOWED_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
 
 class AtthemeFlow(StatesGroup):
     waiting_for_image = State()
+    waiting_for_name = State()
 
 
 def language_for(db, user_id: int) -> str:
     return db.get_language(user_id) or "uz"
 
 
-def theme_name_for(message: Message) -> str:
-    first_name = (message.from_user.first_name or "ThemeGram").strip()
-    safe_name = re.sub(r"[\\/:*?\"<>|\x00-\x1f\x7f]+", "", first_name)
-    safe_name = re.sub(r"\s+", "_", safe_name).strip("._-")[:48] or "ThemeGram"
-    return f"ThemeGram_{safe_name}"
+def normalize_theme_name(value: str) -> str:
+    name = value.strip()
+    if name.lower().endswith(".attheme"):
+        name = name[:-8]
+    name = re.sub(r"[^\w -]", "", name, flags=re.UNICODE)
+    name = re.sub(r"[\s-]+", "_", name).strip("._")[:48]
+    if not name or not any(char.isalnum() for char in name):
+        raise ValueError("attheme_name_invalid")
+    return name
 
 
 async def get_image_from_message(message: Message) -> tuple[bytes, str]:
@@ -69,25 +73,13 @@ async def get_image_from_message(message: Message) -> tuple[bytes, str]:
     return image_bytes, filename
 
 
-def response_filename(content_disposition: str | None, fallback: str) -> str:
-    if content_disposition:
-        match = re.search(
-            r"filename\*=UTF-8''([^;]+)", content_disposition, re.IGNORECASE
-        )
-        if match:
-            filename = unquote(match.group(1)).strip().strip('"')
-            if filename.lower().endswith(".attheme"):
-                return filename
-    return f"{fallback}.attheme"
-
-
 async def request_attheme(
     image_bytes: bytes,
     image_filename: str,
     theme_name: str,
     api_url: str,
     api_key: str,
-) -> tuple[bytes, str]:
+) -> bytes:
     form = aiohttp.FormData()
     form.add_field(
         "image",
@@ -114,10 +106,7 @@ async def request_attheme(
             theme_bytes = await response.read()
             if not theme_bytes:
                 raise RuntimeError("attheme_api_error")
-            filename = response_filename(
-                response.headers.get("Content-Disposition"), theme_name
-            )
-            return theme_bytes, filename
+            return theme_bytes
 
 
 @router.message(F.text.in_({"✨ Tema yaratish", "✨ Создать тему"}))
@@ -133,7 +122,10 @@ async def start_attheme_flow(message: Message, state: FSMContext, db, settings):
 
 @router.message(Command("cancel"))
 async def cancel_attheme_flow(message: Message, state: FSMContext, db):
-    if await state.get_state() != AtthemeFlow.waiting_for_image.state:
+    if await state.get_state() not in {
+        AtthemeFlow.waiting_for_image.state,
+        AtthemeFlow.waiting_for_name.state,
+    }:
         return
     language = language_for(db, message.from_user.id)
     await state.clear()
@@ -141,7 +133,7 @@ async def cancel_attheme_flow(message: Message, state: FSMContext, db):
 
 
 @router.message(AtthemeFlow.waiting_for_image, F.photo | F.document)
-async def create_attheme_from_image(message: Message, state: FSMContext, db, settings):
+async def receive_attheme_image(message: Message, state: FSMContext, db):
     language = language_for(db, message.from_user.id)
     try:
         image_bytes, image_filename = await get_image_from_message(message)
@@ -153,20 +145,47 @@ async def create_attheme_from_image(message: Message, state: FSMContext, db, set
         await message.answer(t(language, "attheme_api_error"))
         return
 
-    theme_name = theme_name_for(message)
+    await state.update_data(image_bytes=image_bytes, image_filename=image_filename)
+    await state.set_state(AtthemeFlow.waiting_for_name)
+    await message.answer(t(language, "attheme_ask_name"))
+
+
+@router.message(AtthemeFlow.waiting_for_name, F.text)
+async def receive_attheme_name(message: Message, state: FSMContext, db, settings):
+    language = language_for(db, message.from_user.id)
+    try:
+        theme_name = normalize_theme_name(message.text or "")
+    except ValueError as exc:
+        await message.answer(t(language, str(exc)))
+        return
+
+    data = await state.get_data()
+    image_bytes = data.get("image_bytes")
+    image_filename = data.get("image_filename")
+    if not image_bytes or not image_filename:
+        await state.clear()
+        await message.answer(t(language, "attheme_image_invalid"))
+        return
+
     status = await message.answer(t(language, "attheme_processing"))
     try:
-        theme_bytes, output_filename = await request_attheme(
+        theme_bytes = await request_attheme(
             image_bytes=image_bytes,
             image_filename=image_filename,
             theme_name=theme_name,
             api_url=settings.attheme_api_url,
             api_key=settings.attheme_api_key,
         )
-        await status.edit_text(t(language, "attheme_file_ready"))
+        output_filename = f"{theme_name}.attheme"
         await message.answer_document(
             BufferedInputFile(theme_bytes, filename=output_filename),
             caption=t(language, "attheme_ready", theme_name=escape(theme_name)),
+        )
+        await status.edit_text(t(language, "attheme_file_ready"))
+        await db.track_event(
+            message.from_user.id,
+            "theme_created",
+            {"filename": output_filename},
         )
     except RuntimeError as exc:
         await status.edit_text(t(language, str(exc)))
@@ -180,7 +199,7 @@ async def create_attheme_from_image(message: Message, state: FSMContext, db, set
         await state.clear()
 
 
-@router.message(AtthemeFlow.waiting_for_image)
-async def waiting_for_attheme_image(message: Message, db):
+@router.message(AtthemeFlow.waiting_for_name)
+async def waiting_for_attheme_name(message: Message, db):
     language = language_for(db, message.from_user.id)
-    await message.answer(t(language, "attheme_image_invalid"))
+    await message.answer(t(language, "attheme_name_invalid"))
