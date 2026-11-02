@@ -96,9 +96,7 @@ async def request_attheme(
         content_type="application/octet-stream",
     )
     form.add_field("theme_name", theme_name)
-    timeout = aiohttp.ClientTimeout(
-        total=API_TIMEOUT_SECONDS, connect=10, sock_read=50
-    )
+    timeout = aiohttp.ClientTimeout(total=API_TIMEOUT_SECONDS, connect=10, sock_read=50)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         async with session.post(
             f"{api_url.rstrip('/')}/api/v1/generate",
@@ -165,9 +163,7 @@ async def create_attheme_from_image(message: Message, state: FSMContext, db, set
             api_url=settings.attheme_api_url,
             api_key=settings.attheme_api_key,
         )
-        await status.edit_text(
-            t(language, "attheme_ready", theme_name=escape(theme_name))
-        )
+        await status.edit_text(t(language, "attheme_file_ready"))
         await message.answer_document(
             BufferedInputFile(theme_bytes, filename=output_filename),
             caption=t(language, "attheme_ready", theme_name=escape(theme_name)),
