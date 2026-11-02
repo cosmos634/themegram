@@ -4,7 +4,8 @@ ThemeGram is an Uzbek- and Russian-language Telegram bot for browsing iOS and An
 
 ## Features
 - iOS / Android themes in Dark, Soft, Anime, Boshqa categories.
-- Image-to-theme generator for Telegram Android: send a JPG, PNG, or WEBP image and receive a named .attheme file.
+- Image-to-theme generator for Telegram Android: send a JPG, PNG, or WEBP image, choose the theme filename, and receive a named .attheme file.
+- Growth Dashboard tracks successful generated themes alongside the existing product-usage events.
 - Random active theme selection without immediate repeats when alternatives exist.
 - Exactly up to 50 active themes cached per platform/category (8 groups total).
 - Theme cache warms at startup and refreshes in the background every hour. Users get themes from the in-memory snapshot only; failed refreshes keep the last successful snapshot.
