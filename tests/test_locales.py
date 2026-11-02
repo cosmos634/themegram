@@ -15,7 +15,7 @@ class LocaleTests(unittest.TestCase):
     def test_attheme_flow_translations_exist(self):
         for language in ("uz", "ru"):
             self.assertIn("Android", t(language, "attheme_intro"))
-            self.assertIn(".attheme", t(language, "attheme_ready", theme_name="ThemeGram_Test"))
+            self.assertIn("ThemeGram_Test", t(language, "attheme_ready", theme_name="ThemeGram_Test"))
             self.assertTrue(t(language, "attheme_processing"))
             self.assertTrue(t(language, "menu_create_theme"))
 
