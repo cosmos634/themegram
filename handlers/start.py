@@ -28,7 +28,7 @@ async def start_handler(message: Message, db, command: CommandObject):
     await db.track_event(message.from_user.id, "bot_started", {"source": source})
     language = db.get_language(message.from_user.id)
     if language not in {"uz", "ru"}:
-        await message.answer(t("uz", "choose_language"), reply_markup=language_keyboard())
+        await message.answer("🌐 Tilni tanlang / Выберите язык", reply_markup=language_keyboard())
         return
     await show_welcome(message, language)
 
