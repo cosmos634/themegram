@@ -89,6 +89,8 @@ class SupabaseDB:
         return datetime.now(timezone.utc).isoformat()
 
     async def touch(self, user, first_source: str = "direct") -> None:
+        if int(user.id) in self.ignored_user_ids:
+            return
         now = self._now()
         cached = self.local.get_user(user.id)
         if cached is None:
