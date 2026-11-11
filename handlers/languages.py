@@ -71,7 +71,7 @@ async def languages_entry(message: Message, db):
         await message.answer(t(language, "db_failed"))
 
 
-@router.callback_query(F.data.regexp(r"^lang:(next|prev):\\d+$"))
+@router.callback_query(F.data.regexp(r"^lang:(next|prev):\d+$"))
 async def language_navigation(callback: CallbackQuery, db):
     language = language_for(db, callback.from_user.id)
     _, action, raw_index = callback.data.split(":")
