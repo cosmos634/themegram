@@ -6,6 +6,7 @@ import logging
 import random
 import re
 import time
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import aiohttp
@@ -25,8 +26,10 @@ class SupabaseError(RuntimeError):
 
 
 class SupabaseDB:
-    def __init__(self, url: str, key: str, *, theme_cache_ttl: int | None = None, page_size: int = 500):
+    def __init__(self, url: str, key: str, *, theme_cache_ttl: int | None = None, page_size: int = 500,
+                 ignored_user_ids: set[int] | list[int] | tuple[int, ...] | None = None):
         self.url, self.key = url.rstrip("/"), key
+        self.ignored_user_ids = {int(user_id) for user_id in (ignored_user_ids or set())}
         self.session: aiohttp.ClientSession | None = None
         self.page_size = max(1, min(int(page_size), 1000))
         self.theme_cache_ttl = SYNC_INTERVAL_SECONDS
@@ -129,16 +132,22 @@ class SupabaseDB:
         profile = self.local.get_user(user_id)
         return profile.get("language") if profile else None
 
+    def _exclude_ignored_users(self, params: dict) -> dict:
+        if self.ignored_user_ids:
+            values = ",".join(str(user_id) for user_id in sorted(self.ignored_user_ids))
+            params["telegram_id"] = f"not.in.({values})"
+        return params
+
     async def traffic_analytics(self) -> dict:
         """Aggregate attribution and language counts from the canonical users table."""
         sources: dict[str, int] = {}
         languages = {"uz": 0, "ru": 0, "unset": 0}
         total = offset = 0
         while True:
-            rows = await self._request("GET", "users", params={
-                "select": "language,first_source", "order": "telegram_id",
+            rows = await self._request("GET", "users", params=self._exclude_ignored_users({
+                "select": "language,first_source,telegram_id", "order": "telegram_id",
                 "offset": str(offset), "limit": str(self.page_size)
-            })
+            }))
             if not isinstance(rows, list):
                 raise SupabaseError("Unexpected analytics response")
             for row in rows:
@@ -251,6 +260,8 @@ class SupabaseDB:
         """Record a small product-analytics event; failures are logged, not user-facing."""
         if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", event_name):
             raise ValueError("Invalid event name")
+        if int(user_id) in self.ignored_user_ids:
+            return
         payload = {"telegram_id": int(user_id), "event_name": event_name,
                    "metadata": metadata or {}}
         try:
@@ -266,10 +277,10 @@ class SupabaseDB:
         counts: dict[str, int] = {}
         offset = 0
         while True:
-            rows = await self._request("GET", "themegram_events", params={
-                "select": "event_name", "created_at": f"gte.{cutoff}",
+            rows = await self._request("GET", "themegram_events", params=self._exclude_ignored_users({
+                "select": "event_name,telegram_id", "created_at": f"gte.{cutoff}",
                 "order": "id", "offset": str(offset), "limit": str(self.page_size)
-            })
+            }))
             if not isinstance(rows, list):
                 raise SupabaseError("Unexpected event analytics response")
             for row in rows:
@@ -415,6 +426,8 @@ class SupabaseDB:
         while True:
             params = {"select": "telegram_id" if table == "users" else "id",
                       "offset": str(offset), "limit": "1000"}
+            if table == "users":
+                self._exclude_ignored_users(params)
             if active_only:
                 params["is_active"] = "eq.true"
             rows = await self._request("GET", table, params=params)
@@ -423,17 +436,59 @@ class SupabaseDB:
                 return total
             offset += len(rows)
 
-    async def user_ids(self) -> list[int]:
+    async def user_ids(self, language: str | None = None) -> list[int]:
+        if language not in {None, "uz", "ru"}:
+            raise ValueError("Unsupported broadcast language")
         result = []
         offset = 0
         while True:
-            rows = await self._request("GET", "users", params={
-                "select": "telegram_id", "order": "telegram_id",
-                "offset": str(offset), "limit": "1000"})
+            params = {"select": "telegram_id", "order": "telegram_id",
+                      "offset": str(offset), "limit": "1000"}
+            if language:
+                params["language"] = f"eq.{language}"
+            self._exclude_ignored_users(params)
+            rows = await self._request("GET", "users", params=params)
             result.extend(int(r["telegram_id"]) for r in rows)
             if len(rows) < 1000:
                 return result
             offset += len(rows)
+
+    async def list_languages(self) -> list[dict]:
+        rows = await self._request("GET", "telegram_languages", params={
+            "select": "id,name,url", "order": "name.asc"
+        })
+        return rows if isinstance(rows, list) else []
+
+    async def get_language_pack(self, language_id: str) -> dict | None:
+        rows = await self._request("GET", "telegram_languages", params={
+            "id": f"eq.{language_id}", "select": "id,name,url", "limit": "1"
+        })
+        return rows[0] if rows else None
+
+    async def add_language_pack(self, name: str, url: str) -> dict:
+        payload = {"id": uuid.uuid4().hex, "name": name.strip(), "url": url.strip()}
+        rows = await self._request("POST", "telegram_languages", json=payload,
+                                   prefer="return=representation")
+        if not rows:
+            raise SupabaseError("Language pack was not created")
+        return rows[0]
+
+    async def update_language_pack(self, language_id: str, values: dict) -> dict:
+        rows = await self._request("PATCH", "telegram_languages",
+                                   params={"id": f"eq.{language_id}"}, json=values,
+                                   prefer="return=representation")
+        if not rows:
+            raise SupabaseError("Language pack was not updated")
+        verified = await self.get_language_pack(language_id)
+        if not verified or any(verified.get(key) != value for key, value in values.items()):
+            raise SupabaseError("Language pack update could not be verified")
+        return verified
+
+    async def delete_language_pack(self, language_id: str) -> bool:
+        rows = await self._request("DELETE", "telegram_languages",
+                                   params={"id": f"eq.{language_id}", "select": "id"},
+                                   prefer="return=representation")
+        return bool(rows)
 
     async def close(self):
         if self.session and not self.session.closed:
