@@ -12,7 +12,8 @@ ThemeGram is an Uzbek- and Russian-language Telegram bot for browsing iOS and An
 - User profiles and temporary user state are cached in SQLite. Normal interactions read and write local state; a missing state is fetched from Supabase once.
 - Dirty local profile/state changes sync to Supabase hourly. Failed writes remain dirty for a later retry. Remote states are merged without overwriting local unsynced changes.
 - State expires after one hour.
-- Admin panel at `/admin`: statistics, add/list/filter/edit/delete themes, and confirmed broadcast.
+- Admin panel at `/admin`: statistics, add/list/filter/edit/delete themes and Telegram language links, plus confirmed Uzbek/Russian/all-user broadcasts.
+- Telegram language catalogue is managed in Supabase; users can browse language packs and open their Telegram installation links. Growth Dashboard records language-card views and install-button clicks.
 - Telegram webhook, `/health` endpoint, and Render deployment.
 
 ## Environment
@@ -41,7 +42,7 @@ ON public.themes (platform, category)
 WHERE is_active IS TRUE;
 ```
 
-No schema changes are required. Keep secrets out of GitHub and keep the Supabase service-role key server-side.
+Apply `migrations/005_language_catalog.sql` in the Supabase SQL Editor before using the language catalogue. Keep secrets out of GitHub and keep the Supabase service-role key server-side.
 
 ## Render
 Configure the required environment variables in Render; `SUPABASE_URL` is already set in `render.yaml`. Add `ATTHEME_API_URL` and `ATTHEME_API_KEY` to the ThemeGram web service environment to enable theme generation. The service runs `python bot.py` and exposes `/health`; verify it returns HTTP 200 and configure UptimeRobot against that path. The deployment filesystem must allow the service to create its SQLite cache. If Render watches `main`, a push to `main` triggers deployment after the PR is merged.
