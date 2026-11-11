@@ -175,7 +175,7 @@ async def language_admin_view(callback: CallbackQuery, settings, db):
     )
 
 
-@router.callback_query(F.data.startswith("langadm:edit:"))
+@router.callback_query(F.data.regexp(r"^langadm:edit:(name|url):[^:]+$"))
 async def language_edit_start(callback: CallbackQuery, settings, state: FSMContext):
     if await deny_callback(callback, settings):
         return
