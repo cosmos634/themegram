@@ -35,7 +35,8 @@ def main_kb():
         [InlineKeyboardButton(text="🚀 Growth Dashboard", callback_data="adm:growth")],
         [InlineKeyboardButton(text="➕ Mavzu qo‘shish", callback_data="adm:add")],
         [InlineKeyboardButton(text="📚 Mavzularni boshqarish", callback_data="adm:list")],
-        [InlineKeyboardButton(text="📢 Barcha foydalanuvchilarga xabar yuborish", callback_data="adm:broadcast")],
+        [InlineKeyboardButton(text="🌐 Til havolalarini boshqarish", callback_data="langadm:menu")],
+        [InlineKeyboardButton(text="📢 Foydalanuvchilarga xabar yuborish", callback_data="adm:broadcast")],
         [InlineKeyboardButton(text="🔙 Asosiy menyu", callback_data="adm:close")],
     ])
 
@@ -115,8 +116,10 @@ async def admin_menu(callback: CallbackQuery, settings, db, state: FSMContext):
                 f"🗂 Kategoriya tanlash: <b>{categories}</b>\n"
                 f"🎨 Tema ko‘rish: <b>{viewed}</b>\n"
                 f"⭐ Sevimliga qo‘shish: <b>{favorites}</b>\n"
-                f"✨ Yaratilgan temalar: <b>{created}</b>\n\n"
-                "<i>Bu hodisalar soni; noyob foydalanuvchilar soni emas.</i>",
+                f"✨ Yaratilgan temalar: <b>{created}</b>\n"
+                f"🌐 Til ko‘rish: <b>{events.get('language_viewed', 0)}</b>\n"
+                f"📥 Til o‘rnatish tugmasi bosilishi: <b>{events.get('language_install_clicked', 0)}</b>\n\n"
+                "<i>Bu hodisalar soni; o‘rnatish tugmasi bosilishi haqiqiy o‘rnatish tasdig‘i emas.</i>",
                 reply_markup=main_kb())
         except SupabaseError:
             await callback.message.edit_text(
@@ -157,8 +160,13 @@ async def admin_menu(callback: CallbackQuery, settings, db, state: FSMContext):
         await show_filters(callback.message, db)
     elif action == "broadcast":
         await state.clear()
-        await state.set_state(Broadcast.message)
-        await callback.message.edit_text("📢 Yuboriladigan xabarni (matn, rasm, video va boshqalar) shu chatga yuboring.", reply_markup=cancel_kb())
+        await state.set_state(Broadcast.audience)
+        await callback.message.edit_text("📢 Xabar yuboriladigan auditoriyani tanlang:", reply_markup=kb([
+            [InlineKeyboardButton(text="🇺🇿 O‘zbek auditoriyasi", callback_data="broadcast:audience:uz")],
+            [InlineKeyboardButton(text="🇷🇺 Русская аудитория", callback_data="broadcast:audience:ru")],
+            [InlineKeyboardButton(text="🌍 Barcha foydalanuvchilar", callback_data="broadcast:audience:all")],
+            [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm:cancel")],
+        ]))
 
 
 async def show_filters(message, db, platform=None, category=None, page=0):
@@ -446,6 +454,22 @@ async def delete_confirm(callback: CallbackQuery, settings, db):
         await callback.message.answer("⚠️ Mavzuni o‘chirib bo‘lmadi.")
 
 
+@router.callback_query(F.data.startswith("broadcast:audience:"), Broadcast.audience)
+async def broadcast_choose_audience(callback: CallbackQuery, settings, state: FSMContext):
+    if await deny_callback(callback, settings): return
+    audience = callback.data.rsplit(":", 1)[1]
+    if audience not in {"uz", "ru", "all"}:
+        await callback.answer("Auditoriya noto‘g‘ri.", show_alert=True)
+        return
+    await state.update_data(audience=audience)
+    await state.set_state(Broadcast.message)
+    labels = {"uz": "O‘zbek auditoriyasi", "ru": "Русская аудитория", "all": "barcha foydalanuvchilar"}
+    await callback.answer()
+    await callback.message.edit_text(
+        f"📢 <b>{labels[audience]}</b> uchun yuboriladigan xabarni (matn, rasm, video va boshqalar) yuboring.",
+        reply_markup=cancel_kb())
+
+
 @router.message(Broadcast.message)
 async def broadcast_preview(message: Message, settings, state: FSMContext):
     if await deny_message(message, settings): return
@@ -456,8 +480,11 @@ async def broadcast_preview(message: Message, settings, state: FSMContext):
                                        message_id=message.message_id)
     except TelegramAPIError:
         pass
-    await message.answer("Ushbu xabar barcha foydalanuvchilarga yuborilsinmi?",
-        reply_markup=kb([[InlineKeyboardButton(text="✅ Barchaga yuborish", callback_data="broadcast:send"),
+    data = await state.get_data()
+    audience = data.get("audience", "all")
+    labels = {"uz": "O‘zbek auditoriyasi", "ru": "Русская аудитория", "all": "barcha foydalanuvchilar"}
+    await message.answer(f"Ushbu xabar <b>{labels[audience]}</b>ga yuborilsinmi?",
+        reply_markup=kb([[InlineKeyboardButton(text="✅ Tasdiqlash va yuborish", callback_data="broadcast:send"),
                           InlineKeyboardButton(text="❌ Bekor qilish", callback_data="adm:cancel")]]))
 
 
@@ -468,7 +495,8 @@ async def broadcast_send(callback: CallbackQuery, settings, db, state: FSMContex
     await state.clear()
     await callback.answer("Yuborish boshlandi.")
     try:
-        ids = await db.user_ids()
+        audience = data.get("audience", "all")
+        ids = await db.user_ids(language=None if audience == "all" else audience)
     except SupabaseError:
         await callback.message.answer("⚠️ Foydalanuvchilar ro‘yxatini bazadan olib bo‘lmadi.")
         return
