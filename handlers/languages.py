@@ -19,7 +19,7 @@ def language_for(db, user_id: int) -> str:
 def language_card_keyboard(language: str, item: dict, index: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=t(language, "language_install"),
-                              callback_data=f"lang:install:{item['id']}")],
+                              url=item["url"])],
         [
             InlineKeyboardButton(text=t(language, "language_back"),
                                  callback_data=f"lang:prev:{index}"),
@@ -88,21 +88,3 @@ async def language_navigation(callback: CallbackQuery, db):
         await callback.answer(t(language, "db_failed"), show_alert=True)
 
 
-@router.callback_query(F.data.startswith("lang:install:"))
-async def language_install(callback: CallbackQuery, db):
-    language = language_for(db, callback.from_user.id)
-    language_id = callback.data.split(":", 2)[2]
-    try:
-        item = await db.get_language_pack(language_id)
-        if not item:
-            await callback.answer(t(language, "language_not_found"), show_alert=True)
-            return
-        await db.track_event(callback.from_user.id, "language_install_clicked",
-                             {"language_id": str(item["id"])})
-        await callback.answer()
-        markup = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text=t(language, "language_open"), url=item["url"])
-        ]])
-        await callback.message.answer(t(language, "language_open_hint"), reply_markup=markup)
-    except SupabaseError:
-        await callback.answer(t(language, "db_failed"), show_alert=True)
