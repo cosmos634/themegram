@@ -15,6 +15,8 @@ from handlers.start import router as start_router
 from handlers.attheme import router as attheme_router
 from handlers.themes import router as themes_router
 from handlers.admin import router as admin_router
+from handlers.languages import router as languages_router
+from handlers.admin_languages import router as admin_languages_router
 from services.cleanup import cleanup_loop
 from services.theme_service import ThemeService
 
@@ -31,7 +33,8 @@ async def health(request: web.Request) -> web.Response:
 
 async def main() -> None:
     settings = load_settings()
-    db = SupabaseDB(settings.supabase_url, settings.supabase_service_role_key)
+    db = SupabaseDB(settings.supabase_url, settings.supabase_service_role_key,
+                    ignored_user_ids={settings.admin_id} if settings.admin_id else set())
     await db.initialize()
 
     bot = Bot(
@@ -43,6 +46,8 @@ async def main() -> None:
     dispatcher.include_router(attheme_router)
     dispatcher.include_router(themes_router)
     dispatcher.include_router(admin_router)
+    dispatcher.include_router(languages_router)
+    dispatcher.include_router(admin_languages_router)
     dispatcher["db"] = db
     dispatcher["settings"] = settings
     dispatcher["themes"] = ThemeService(db)
