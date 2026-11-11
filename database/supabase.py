@@ -89,8 +89,6 @@ class SupabaseDB:
         return datetime.now(timezone.utc).isoformat()
 
     async def touch(self, user, first_source: str = "direct") -> None:
-        if int(user.id) in self.ignored_user_ids:
-            return
         now = self._now()
         cached = self.local.get_user(user.id)
         if cached is None:
@@ -219,7 +217,13 @@ class SupabaseDB:
     async def sync_user_state(self) -> None:
         """Push dirty local rows, then merge remote state without overwriting local edits."""
         # Dirty flags are cleared only after a successful remote write.
-        users = self.local.dirty_users()
+        all_dirty_users = self.local.dirty_users()
+        ignored_users = [row for row in all_dirty_users
+                         if int(row.get("telegram_id", 0)) in self.ignored_user_ids]
+        if ignored_users:
+            self.local.mark_users_clean(ignored_users)
+        users = [row for row in all_dirty_users
+                 if int(row.get("telegram_id", 0)) not in self.ignored_user_ids]
         if users:
             await self._request("POST", "users", params={"on_conflict": "telegram_id"},
                                 json=users, prefer="resolution=merge-duplicates,return=minimal")
