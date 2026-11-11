@@ -16,5 +16,17 @@ class EditTheme(StatesGroup):
 
 
 class Broadcast(StatesGroup):
+    audience = State()
     message = State()
+    confirm = State()
+
+
+class AddLanguage(StatesGroup):
+    name = State()
+    url = State()
+    confirm = State()
+
+
+class EditLanguage(StatesGroup):
+    value = State()
     confirm = State()
